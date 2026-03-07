@@ -1,0 +1,114 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "name": "John Doe",
+      "email": "john@example.com",
+      "password": "password123",
+      "avatar": "https://i.pravatar.cc/150?u=john",
+      "points": 1250
+    },
+    {
+      "id": 2,
+      "name": "Jane Smith",
+      "email": "jane@example.com",
+      "password": "password123",
+      "avatar": "https://i.pravatar.cc/150?u=jane",
+      "points": 2100
+    },
+    {
+      "id": 3,
+      "name": "Mike Johnson",
+      "email": "mike@example.com",
+      "password": "password123",
+      "avatar": "https://i.pravatar.cc/150?u=mike",
+      "points": 850
+    }
+  ],
+  "workouts": [
+    {
+      "id": 1,
+      "user_id": 1,
+      "date": "2026-03-07",
+      "type": "Strength Training",
+      "duration": 45,
+      "calories": 320
+    },
+    {
+      "id": 2,
+      "user_id": 1,
+      "date": "2023-10-25",
+      "type": "HIIT Cardio",
+      "duration": 30,
+      "calories": 450
+    }
+  ],
+  "nutrition": [
+    {
+      "id": 1,
+      "user_id": 1,
+      "date": "2026-03-07",
+      "meal": "Breakfast (Oatmeal & Eggs)",
+      "calories": 450,
+      "protein": 25,
+      "carbs": 50,
+      "fat": 15
+    },
+    {
+      "id": 2,
+      "user_id": 1,
+      "date": "2026-03-07",
+      "meal": "Lunch (Chicken Salad)",
+      "calories": 600,
+      "protein": 45,
+      "carbs": 20,
+      "fat": 25
+    }
+  ],
+  "posts": [
+    {
+      "id": 1,
+      "user_id": 2,
+      "content": "Just hit a new PR on deadlifts! 225lbs 💪",
+      "timestamp": "2026-03-07T13:30:24.810Z",
+      "likes": 12
+    },
+    {
+      "id": 2,
+      "user_id": 3,
+      "content": "Anyone up for a running buddy challenge this weekend?",
+      "timestamp": "2026-03-06T14:30:24.810Z",
+      "likes": 5
+    },
+    {
+      "id": 3,
+      "user_id": 1,
+      "content": "hi",
+      "timestamp": "2026-03-07T14:36:20.755Z",
+      "likes": 0
+    }
+  ],
+  "services": [
+    {
+      "id": 1,
+      "title": "1-on-1 Personal Training",
+      "description": "Get a dedicated coach to accelerate your progress with customized workout plans and form correction.",
+      "price": 49.99,
+      "image": "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+    },
+    {
+      "id": 2,
+      "title": "Custom Nutrition Plan",
+      "description": "A 4-week meal plan tailored to your body type, allergies, and specific fitness goals.",
+      "price": 29.99,
+      "image": "https://images.unsplash.com/photo-1490645935967-10de6ba17061?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+    },
+    {
+      "id": 3,
+      "title": "Premium Supplements Stack",
+      "description": "Our top-tier whey protein and pre-workout bundle for maximum recovery.",
+      "price": 89.99,
+      "image": "https://images.unsplash.com/photo-1593095948071-474c5cc2989d?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+    }
+  ]
+}

@@ -1,0 +1,86 @@
+import React, { useState } from 'react';
+import { useAuth } from '../App';
+import { LogOut, Settings, Award } from 'lucide-react';
+import './Profile.css';
+
+const Profile = () => {
+  const { user, token, logout, setUser } = useAuth();
+  const [editMode, setEditMode] = useState(false);
+  const [formData, setFormData] = useState({ name: user?.name, avatar: user?.avatar });
+
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/user', {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(formData)
+      });
+      if (res.ok) {
+        setUser({ ...user, ...formData });
+        setEditMode(false);
+      }
+    } catch (err) {
+      console.error('Update failed', err);
+    }
+  };
+
+  return (
+    <div className="page profile-page">
+      <div className="profile-header text-center mb-4 cursor-pointer">
+        <div className="avatar-wrapper mb-2">
+           <img src={user?.avatar} alt="Profile" className="profile-avatar" />
+        </div>
+        <h1 className="profile-name">{user?.name}</h1>
+        <p className="text-secondary">{user?.email}</p>
+        <div className="points-badge mt-2">
+           <Award size={16} className="text-accent"/> {user?.points} Points Total
+        </div>
+      </div>
+
+      <div className="glass-card mb-4 section-settings">
+         <div className="flex-between mb-4">
+            <h3>Personal Information</h3>
+            <button className="btn btn-secondary btn-sm" onClick={() => setEditMode(!editMode)}>
+              {editMode ? 'Cancel' : <><Settings size={14}/> Edit</>}
+            </button>
+         </div>
+
+         {editMode ? (
+            <form onSubmit={handleUpdate}>
+               <div className="input-group">
+                  <label className="input-label">Full Name</label>
+                  <input type="text" className="input" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+               </div>
+               <div className="input-group">
+                  <label className="input-label">Avatar URL (Add your image)</label>
+                  <input type="text" className="input" value={formData.avatar} onChange={e => setFormData({...formData, avatar: e.target.value})} />
+               </div>
+               <button type="submit" className="btn btn-primary btn-full mt-2">Save Changes</button>
+            </form>
+         ) : (
+            <div className="info-display">
+               <div className="info-row">
+                  <span className="info-label">Name</span>
+                  <span className="info-value">{user?.name}</span>
+               </div>
+               <div className="info-row">
+                  <span className="info-label">Email</span>
+                  <span className="info-value">{user?.email}</span>
+               </div>
+            </div>
+         )}
+      </div>
+
+      <button className="btn btn-secondary btn-full logout-btn" onClick={logout}>
+         <LogOut size={18} color="#ff4d4f" /> <span style={{color: '#ff4d4f'}}>Logout</span>
+      </button>
+
+    </div>
+  );
+};
+
+export default Profile;
