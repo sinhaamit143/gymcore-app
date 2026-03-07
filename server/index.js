@@ -16,9 +16,9 @@ app.use(express.static(path.join(__dirname, '../client/dist')));
 
 let db = {
   users: [
-    { id: 1, name: 'John Doe', email: 'john@example.com', password: 'password123', avatar: 'https://i.pravatar.cc/150?u=john', points: 1250, currentWeight: 185, targetWeight: 175 },
-    { id: 2, name: 'Jane Smith', email: 'jane@example.com', password: 'password123', avatar: 'https://i.pravatar.cc/150?u=jane', points: 2100, currentWeight: 140, targetWeight: 135 },
-    { id: 3, name: 'Mike Johnson', email: 'mike@example.com', password: 'password123', avatar: 'https://i.pravatar.cc/150?u=mike', points: 850, currentWeight: 210, targetWeight: 195 }
+    { id: 1, name: 'John Doe', email: 'john@example.com', password: 'password123', avatar: 'https://i.pravatar.cc/150?u=john', points: 1250, currentWeight: 185, targetWeight: 175, age: 28, phone: '+1 555-0192', bio: 'Fitness enthusiast. Looking to get stronger!', purchasedServices: [1] },
+    { id: 2, name: 'Jane Smith', email: 'jane@example.com', password: 'password123', avatar: 'https://i.pravatar.cc/150?u=jane', points: 2100, currentWeight: 140, targetWeight: 135, age: 31, phone: '', bio: 'Running is my therapy.', purchasedServices: [] },
+    { id: 3, name: 'Mike Johnson', email: 'mike@example.com', password: 'password123', avatar: 'https://i.pravatar.cc/150?u=mike', points: 850, currentWeight: 210, targetWeight: 195, age: 25, phone: '', bio: '', purchasedServices: [3] }
   ],
   workouts: [
     { id: 1, user_id: 1, date: new Date().toISOString().split('T')[0], type: 'Strength Training', duration: 45, calories: 320 },

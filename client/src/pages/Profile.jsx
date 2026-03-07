@@ -1,13 +1,19 @@
 import React, { useState } from 'react';
-import { useAuth, useTheme } from '../App';
-import { LogOut, Settings, Award, Sun, Moon } from 'lucide-react';
+import { useAuth } from '../App';
+import { LogOut, Settings, Award, CheckCircle } from 'lucide-react';
 import './Profile.css';
 
 const Profile = () => {
   const { user, token, logout, setUser } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const [editMode, setEditMode] = useState(false);
-  const [formData, setFormData] = useState({ name: user?.name, avatar: user?.avatar });
+  const [allServices, setAllServices] = useState([]);
+  const [formData, setFormData] = useState({ 
+    name: user?.name || '',  
+    avatar: user?.avatar || '',
+    age: user?.age || '',
+    phone: user?.phone || '',
+    bio: user?.bio || ''
+  });
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -23,6 +29,21 @@ const Profile = () => {
       reader.readAsDataURL(file);
     }
   };
+
+  React.useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        const res = await fetch('/api/services', { headers: { 'Authorization': `Bearer ${token}` } });
+        if (res.ok) {
+          const data = await res.json();
+          setAllServices(data);
+        }
+      } catch (err) { console.error(err); }
+    };
+    if (user?.purchasedServices?.length > 0) {
+      fetchServices();
+    }
+  }, [token, user?.purchasedServices]);
 
   const handleUpdate = async (e) => {
     e.preventDefault();
@@ -47,12 +68,6 @@ const Profile = () => {
   return (
     <div className="page profile-page">
       <div className="profile-header text-center mb-4 cursor-pointer" style={{ position: 'relative' }}>
-         <button 
-           onClick={toggleTheme} 
-           style={{ position: 'absolute', top: 0, right: 0, background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '8px' }}
-         >
-           {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
-         </button>
         <div className="avatar-wrapper mb-2">
            <img src={user?.avatar} alt="Profile" className="profile-avatar" />
         </div>
@@ -76,6 +91,20 @@ const Profile = () => {
                <div className="input-group">
                   <label className="input-label">Full Name</label>
                   <input type="text" className="input" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+               </div>
+               <div className="flex-between" style={{gap: '10px'}}>
+                 <div className="input-group flex-1">
+                    <label className="input-label">Age</label>
+                    <input type="number" className="input" value={formData.age} onChange={e => setFormData({...formData, age: e.target.value})} />
+                 </div>
+                 <div className="input-group flex-1">
+                    <label className="input-label">Phone</label>
+                    <input type="text" className="input" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                 </div>
+               </div>
+               <div className="input-group">
+                  <label className="input-label">Bio</label>
+                  <textarea className="input" value={formData.bio} onChange={e => setFormData({...formData, bio: e.target.value})} rows="3"></textarea>
                </div>
                <div className="input-group">
                   <label className="input-label">Profile Picture (Max 5MB)</label>
@@ -102,9 +131,38 @@ const Profile = () => {
                   <span className="info-label">Email</span>
                   <span className="info-value">{user?.email}</span>
                </div>
+               <div className="info-row">
+                  <span className="info-label">Age</span>
+                  <span className="info-value">{user?.age || 'Not provided'}</span>
+               </div>
+               <div className="info-row">
+                  <span className="info-label">Phone</span>
+                  <span className="info-value">{user?.phone || 'Not provided'}</span>
+               </div>
+               <div className="info-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
+                  <span className="info-label">Bio</span>
+                  <span className="info-value text-secondary" style={{ lineHeight: '1.5' }}>{user?.bio || 'No bio yet.'}</span>
+               </div>
             </div>
          )}
       </div>
+
+      {user?.purchasedServices?.length > 0 && (
+        <div className="glass-card mb-4 section-settings">
+          <h3 className="mb-4">My Subscriptions</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {allServices.filter(s => user.purchasedServices.includes(s.id)).map(svc => (
+              <div key={svc.id} className="flex-between" style={{ background: 'rgba(0,0,0,0.2)', padding: '12px 16px', borderRadius: '12px' }}>
+                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <CheckCircle size={18} color="#00ffaa" />
+                    <span style={{ fontWeight: '500', color: '#fff' }}>{svc.title}</span>
+                 </div>
+                 <span className="text-secondary" style={{ fontSize: '12px' }}>Active</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <button className="btn btn-secondary btn-full logout-btn" onClick={logout}>
          <LogOut size={18} color="#ff4d4f" /> <span style={{color: '#ff4d4f'}}>Logout</span>

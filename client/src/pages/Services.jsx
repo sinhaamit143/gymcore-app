@@ -4,7 +4,7 @@ import { Star, CheckCircle, X, CreditCard } from 'lucide-react';
 import './Services.css';
 
 const Services = () => {
-  const { token } = useAuth();
+  const { user, token, setUser } = useAuth();
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedService, setSelectedService] = useState(null);
@@ -30,7 +30,23 @@ const Services = () => {
 
   const handleCheckout = () => {
     setIsProcessing(true);
-    setTimeout(() => {
+    setTimeout(async () => {
+      
+      try {
+        const updatedServices = [...(user.purchasedServices || []), selectedService.id];
+        const res = await fetch('/api/user', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ purchasedServices: updatedServices })
+        });
+        
+        if (res.ok) {
+           setUser({ ...user, purchasedServices: updatedServices });
+        }
+      } catch (err) {
+        console.error('Failed to save purchase');
+      }
+
       setIsProcessing(false);
       setIsSuccess(true);
       setTimeout(() => {
@@ -64,7 +80,11 @@ const Services = () => {
 
                   <div className="flex-between mt-4">
                      <span className="service-price">${svc.price}</span>
-                     <button className="btn btn-primary btn-sm" onClick={() => setSelectedService(svc)}>Get Now</button>
+                     {user?.purchasedServices?.includes(svc.id) ? (
+                        <button className="btn btn-secondary btn-sm" disabled style={{ color: '#00ffaa' }}>Purchased</button>
+                     ) : (
+                        <button className="btn btn-primary btn-sm" onClick={() => setSelectedService(svc)}>Get Now</button>
+                     )}
                   </div>
                </div>
             </div>

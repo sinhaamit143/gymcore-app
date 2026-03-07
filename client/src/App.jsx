@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Sun, Moon } from 'lucide-react';
 import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
 import Community from './pages/Community';
@@ -94,11 +95,34 @@ const ProtectedRoute = ({ children }) => {
 // --- App Layout Wrapper ---
 const AppLayout = ({ children }) => {
   const { user } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const hideNav = location.pathname === '/login';
 
   return (
     <div className="app-container">
+      {user && !hideNav && (
+        <div style={{ position: 'fixed', top: '16px', right: '16px', zIndex: 9999 }}>
+          <button 
+             onClick={toggleTheme} 
+             style={{ 
+               background: 'var(--glass-bg)', 
+               backdropFilter: 'blur(10px)',
+               border: '1px solid var(--glass-border)', 
+               color: 'var(--text-primary)', 
+               cursor: 'pointer', 
+               padding: '10px',
+               borderRadius: '50%',
+               display: 'flex',
+               justifyContent: 'center',
+               alignItems: 'center',
+               boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+             }}
+           >
+             {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+           </button>
+        </div>
+      )}
       {children}
       {user && !hideNav && <BottomNav />}
     </div>
