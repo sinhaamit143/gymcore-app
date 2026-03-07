@@ -6,7 +6,7 @@ const path = require('path');
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' })); // Expanded for base64 uploads
 
 const JWT_SECRET = 'gym_app_secret_key_123';
 const DB_FILE = path.join(__dirname, 'db.json');
@@ -29,8 +29,8 @@ let db = {
     { id: 2, user_id: 1, date: new Date().toISOString().split('T')[0], meal: 'Lunch (Chicken Salad)', calories: 600, protein: 45, carbs: 20, fat: 25 }
   ],
   posts: [
-    { id: 1, user_id: 2, content: 'Just hit a new PR on deadlifts! 225lbs 💪', timestamp: new Date(Date.now() - 3600000).toISOString(), likes: 12 },
-    { id: 2, user_id: 3, content: 'Anyone up for a running buddy challenge this weekend?', timestamp: new Date(Date.now() - 86400000).toISOString(), likes: 5 }
+    { id: 1, user_id: 2, content: 'Just hit a new PR on deadlifts! 225lbs 💪', timestamp: new Date(Date.now() - 3600000).toISOString(), likes: 12, likedBy: [], comments: [{ id: 1, user_id: 3, content: 'Awesome job!', timestamp: new Date().toISOString() }] },
+    { id: 2, user_id: 3, content: 'Anyone up for a running buddy challenge this weekend?', timestamp: new Date(Date.now() - 86400000).toISOString(), likes: 5, likedBy: [], comments: [] }
   ],
   services: [
     { id: 1, title: '1-on-1 Personal Training', description: 'Get a dedicated coach to accelerate your progress with customized workout plans and form correction.', price: 49.99, image: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80' },
@@ -128,16 +128,58 @@ app.post('/api/nutrition', authenticateToken, (req, res) => {
 app.get('/api/community/posts', authenticateToken, (req, res) => {
   const posts = db.posts.map(p => {
     const user = db.users.find(u => u.id === p.user_id);
-    return { ...p, name: user?.name, avatar: user?.avatar };
+    const comments = (p.comments || []).map(c => {
+      const cUser = db.users.find(u => u.id === c.user_id);
+      return { ...c, name: cUser?.name, avatar: cUser?.avatar };
+    });
+    return { ...p, name: user?.name, avatar: user?.avatar, comments };
   }).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   res.json(posts);
 });
 
 app.post('/api/community/posts', authenticateToken, (req, res) => {
-  const post = { id: db.posts.length + 1, user_id: req.user.id, content: req.body.content, timestamp: new Date().toISOString(), likes: 0 };
+  const post = { id: db.posts.length + 1, user_id: req.user.id, content: req.body.content, timestamp: new Date().toISOString(), likes: 0, likedBy: [], comments: [] };
   db.posts.push(post);
   saveDb();
   res.json({ id: post.id, message: 'Post created!' });
+});
+
+app.post('/api/community/posts/:id/like', authenticateToken, (req, res) => {
+  const post = db.posts.find(p => p.id === parseInt(req.params.id));
+  if (!post) return res.status(404).json({ error: 'Post not found' });
+  
+  if (!post.likedBy) post.likedBy = [];
+  const likedIndex = post.likedBy.indexOf(req.user.id);
+  if (likedIndex > -1) {
+    post.likedBy.splice(likedIndex, 1);
+    post.likes = Math.max(0, post.likes - 1);
+  } else {
+    post.likedBy.push(req.user.id);
+    post.likes += 1;
+  }
+  saveDb();
+  res.json({ likes: post.likes, likedBy: post.likedBy });
+});
+
+app.post('/api/community/posts/:id/comment', authenticateToken, (req, res) => {
+  const { content } = req.body;
+  if (!content) return res.status(400).json({ error: 'Content required' });
+  
+  const post = db.posts.find(p => p.id === parseInt(req.params.id));
+  if (!post) return res.status(404).json({ error: 'Post not found' });
+  
+  if (!post.comments) post.comments = [];
+  const newComment = {
+    id: post.comments.length + 1,
+    user_id: req.user.id,
+    content,
+    timestamp: new Date().toISOString()
+  };
+  post.comments.push(newComment);
+  saveDb();
+  
+  const user = db.users.find(u => u.id === req.user.id);
+  res.json({ ...newComment, name: user?.name, avatar: user?.avatar });
 });
 
 app.get('/api/leaderboard', authenticateToken, (req, res) => {

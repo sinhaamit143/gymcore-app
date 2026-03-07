@@ -8,6 +8,8 @@ const Community = () => {
   const [posts, setPosts] = useState([]);
   const [newPost, setNewPost] = useState('');
   const [loading, setLoading] = useState(true);
+  const [activeCommentPost, setActiveCommentPost] = useState(null);
+  const [commentText, setCommentText] = useState('');
 
   const fetchPosts = async () => {
     try {
@@ -45,6 +47,34 @@ const Community = () => {
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const handleLike = async (postId) => {
+    try {
+      await fetch(`/api/community/posts/${postId}/like`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      fetchPosts();
+    } catch (err) { console.error(err); }
+  };
+
+  const handleCommentSubmit = async (e, postId) => {
+    e.preventDefault();
+    if (!commentText.trim()) return;
+    try {
+      await fetch(`/api/community/posts/${postId}/comment`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify({ content: commentText })
+      });
+      setCommentText('');
+      setActiveCommentPost(null);
+      fetchPosts();
+    } catch (err) { console.error(err); }
   };
 
   const formatTime = (isoString) => {
@@ -89,10 +119,55 @@ const Community = () => {
               <div className="post-content">
                 <p>{post.content}</p>
               </div>
-              <div className="post-footer">
-                <button className="action-btn"><Heart size={18} /> {post.likes} Likes</button>
-                <button className="action-btn"><MessageCircle size={18} /> Comment</button>
+              <div className="post-footer" style={{ display: 'flex', gap: '16px' }}>
+                <button 
+                  className={`action-btn ${post.likedBy?.includes(user?.id) ? 'liked' : ''}`} 
+                  onClick={() => handleLike(post.id)}
+                  style={{ color: post.likedBy?.includes(user?.id) ? '#ff4d4f' : 'inherit' }}
+                >
+                  <Heart size={18} fill={post.likedBy?.includes(user?.id) ? '#ff4d4f' : 'none'} /> {post.likes} Likes
+                </button>
+                <button 
+                  className="action-btn" 
+                  onClick={() => {
+                    setActiveCommentPost(activeCommentPost === post.id ? null : post.id);
+                    setCommentText('');
+                  }}
+                >
+                  <MessageCircle size={18} /> {post.comments?.length || 0} Comments
+                </button>
               </div>
+
+              {post.comments && post.comments.length > 0 && (
+                <div className="comments-list" style={{ marginTop: '16px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '16px' }}>
+                  {post.comments.map(c => (
+                    <div key={c.id} className="comment-item" style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                      <img src={c.avatar} alt={c.name} style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />
+                      <div className="comment-content" style={{ background: 'rgba(0,0,0,0.2)', padding: '8px 12px', borderRadius: '12px', flex: 1 }}>
+                        <h5 style={{ fontSize: '13px', marginBottom: '4px', color: '#fff' }}>{c.name}</h5>
+                        <p style={{ fontSize: '14px', color: '#ccc' }}>{c.content}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {activeCommentPost === post.id && (
+                <form className="comment-form flex-between" style={{ marginTop: '12px', gap: '8px' }} onSubmit={(e) => handleCommentSubmit(e, post.id)}>
+                  <input 
+                    type="text" 
+                    className="input" 
+                    placeholder="Write a reply..." 
+                    value={commentText} 
+                    onChange={e => setCommentText(e.target.value)} 
+                    autoFocus 
+                    style={{ padding: '10px 14px' }}
+                  />
+                  <button type="submit" className="btn btn-primary" style={{ padding: '10px 16px' }} disabled={!commentText.trim()}>
+                    <Send size={16} />
+                  </button>
+                </form>
+              )}
             </div>
           ))}
         </div>

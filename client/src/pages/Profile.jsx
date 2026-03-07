@@ -8,6 +8,21 @@ const Profile = () => {
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState({ name: user?.name, avatar: user?.avatar });
 
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Image must be less than 5MB');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData({ ...formData, avatar: reader.result });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleUpdate = async (e) => {
     e.preventDefault();
     try {
@@ -56,8 +71,17 @@ const Profile = () => {
                   <input type="text" className="input" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
                </div>
                <div className="input-group">
-                  <label className="input-label">Avatar URL (Add your image)</label>
-                  <input type="text" className="input" value={formData.avatar} onChange={e => setFormData({...formData, avatar: e.target.value})} />
+                  <label className="input-label">Profile Picture (Max 5MB)</label>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    className="input" 
+                    onChange={handleImageChange}
+                    style={{ padding: '10px' }}
+                  />
+                  {formData.avatar && formData.avatar.startsWith('data:') && (
+                     <div style={{ marginTop: '8px', fontSize: '13px', color: '#00ffaa' }}>✓ New image loaded</div>
+                  )}
                </div>
                <button type="submit" className="btn btn-primary btn-full mt-2">Save Changes</button>
             </form>
