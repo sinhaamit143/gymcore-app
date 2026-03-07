@@ -11,8 +11,31 @@ import './index.css';
 
 // --- Context & Auth State ---
 const AuthContext = createContext(null);
+const ThemeContext = createContext(null);
 
 export const useAuth = () => useContext(AuthContext);
+export const useTheme = () => useContext(ThemeContext);
+
+const ThemeProvider = ({ children }) => {
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
+
+  useEffect(() => {
+    localStorage.setItem('theme', theme);
+    if (theme === 'light') {
+      document.body.classList.add('light-mode');
+    } else {
+      document.body.classList.remove('light-mode');
+    }
+  }, [theme]);
+
+  const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+
+  return (
+    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  );
+};
 
 const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -85,8 +108,9 @@ const AppLayout = ({ children }) => {
 // --- Main App Component ---
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
+    <ThemeProvider>
+      <AuthProvider>
+        <BrowserRouter>
         <AppLayout>
           <Routes>
             <Route path="/login" element={<Auth />} />
@@ -116,6 +140,7 @@ function App() {
         </AppLayout>
       </BrowserRouter>
     </AuthProvider>
+    </ThemeProvider>
   );
 }
 

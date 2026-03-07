@@ -16,9 +16,9 @@ app.use(express.static(path.join(__dirname, '../client/dist')));
 
 let db = {
   users: [
-    { id: 1, name: 'John Doe', email: 'john@example.com', password: 'password123', avatar: 'https://i.pravatar.cc/150?u=john', points: 1250 },
-    { id: 2, name: 'Jane Smith', email: 'jane@example.com', password: 'password123', avatar: 'https://i.pravatar.cc/150?u=jane', points: 2100 },
-    { id: 3, name: 'Mike Johnson', email: 'mike@example.com', password: 'password123', avatar: 'https://i.pravatar.cc/150?u=mike', points: 850 }
+    { id: 1, name: 'John Doe', email: 'john@example.com', password: 'password123', avatar: 'https://i.pravatar.cc/150?u=john', points: 1250, currentWeight: 185, targetWeight: 175 },
+    { id: 2, name: 'Jane Smith', email: 'jane@example.com', password: 'password123', avatar: 'https://i.pravatar.cc/150?u=jane', points: 2100, currentWeight: 140, targetWeight: 135 },
+    { id: 3, name: 'Mike Johnson', email: 'mike@example.com', password: 'password123', avatar: 'https://i.pravatar.cc/150?u=mike', points: 850, currentWeight: 210, targetWeight: 195 }
   ],
   workouts: [
     { id: 1, user_id: 1, date: new Date().toISOString().split('T')[0], type: 'Strength Training', duration: 45, calories: 320 },

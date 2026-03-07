@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../App';
-import { Flame, Dumbbell, Apple, Plus, Calendar, X } from 'lucide-react';
+import { Flame, Dumbbell, Apple, Plus, Calendar, X, Target, Edit2 } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import './Dashboard.css';
 
 const Dashboard = () => {
@@ -10,8 +11,10 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [showWorkoutModal, setShowWorkoutModal] = useState(false);
   const [showNutritionModal, setShowNutritionModal] = useState(false);
+  const [showWeightModal, setShowWeightModal] = useState(false);
   const [workoutForm, setWorkoutForm] = useState({ type: '', duration: '', calories: '' });
   const [nutritionForm, setNutritionForm] = useState({ meal: '', calories: '', protein: '', carbs: '', fat: '' });
+  const [weightForm, setWeightForm] = useState({ current: '' });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -68,6 +71,21 @@ const Dashboard = () => {
     } catch (err) { console.error(err); }
   };
 
+  const handleWeightSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/user', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ currentWeight: parseInt(weightForm.current) })
+      });
+      if (res.ok) {
+        setShowWeightModal(false);
+        window.location.reload();
+      }
+    } catch (err) { console.error(err); }
+  };
+
   if (loading) return <div className="page"><p>Loading dashboard...</p></div>;
 
   const todayWorkouts = workouts.filter(w => w.date === new Date().toISOString().split('T')[0]);
@@ -75,6 +93,25 @@ const Dashboard = () => {
 
   const todayNutrition = nutrition.filter(n => n.date === new Date().toISOString().split('T')[0]);
   const caloriesEaten = todayNutrition.reduce((sum, n) => sum + n.calories, 0);
+
+  // Generate Chart Data
+  const last7Days = Array.from({length: 7}, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    const dateStr = d.toISOString().split('T')[0];
+    
+    return {
+      name: d.toLocaleDateString('en-US', { weekday: 'short' }),
+      Burned: workouts.filter(w => w.date === dateStr).reduce((sum, w) => sum + w.calories, 0),
+      Eaten: nutrition.filter(n => n.date === dateStr).reduce((sum, n) => sum + n.calories, 0)
+    };
+  });
+
+  // Calculate Goal Progress
+  const startWeight = user?.currentWeight > user?.targetWeight ? user.currentWeight + 20 : user?.currentWeight - 20; // Mock start
+  const totalToLose = Math.abs(startWeight - user?.targetWeight);
+  const currentLost = Math.abs(startWeight - user?.currentWeight);
+  const progressPercent = Math.min(100, Math.max(0, (currentLost / totalToLose) * 100));
 
   return (
     <div className="page dashboard-page">
@@ -93,7 +130,7 @@ const Dashboard = () => {
           </div>
           <div className="stat-info">
             <span className="stat-value">{caloriesBurned}</span>
-            <span className="stat-label">Kcal Burned</span>
+            <span className="stat-label">Kcal Burned Today</span>
           </div>
         </div>
         
@@ -103,9 +140,41 @@ const Dashboard = () => {
           </div>
           <div className="stat-info">
             <span className="stat-value">{caloriesEaten}</span>
-            <span className="stat-label">Kcal Eaten</span>
+            <span className="stat-label">Kcal Eaten Today</span>
           </div>
         </div>
+      </div>
+
+      {user?.targetWeight && (
+        <div className="glass-card mb-4">
+          <div className="flex-between mb-2">
+            <div>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Target size={18} className="text-accent" /> Weight Goal</h3>
+              <p className="text-secondary" style={{ fontSize: '14px' }}>{user.currentWeight} lbs → {user.targetWeight} lbs</p>
+            </div>
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowWeightModal(true)}>
+              <Edit2 size={14} /> Update
+            </button>
+          </div>
+          <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', marginTop: '12px' }}>
+             <div style={{ width: `${progressPercent}%`, height: '100%', background: 'var(--accent-color)', transition: 'width 1s ease-in-out' }}></div>
+          </div>
+        </div>
+      )}
+
+      <div className="glass-card mb-4" style={{ height: '250px', padding: '16px 16px 0 0' }}>
+        <h3 className="mb-4" style={{ paddingLeft: '20px' }}>Activity Overview</h3>
+        <ResponsiveContainer width="100%" height="80%">
+          <BarChart data={last7Days}>
+            <XAxis dataKey="name" stroke="#8b949e" fontSize={12} tickLine={false} axisLine={false} />
+            <Tooltip 
+              cursor={{fill: 'rgba(255,255,255,0.05)'}}
+              contentStyle={{ background: '#161b22', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff' }} 
+            />
+            <Bar dataKey="Burned" fill="#ff4d4f" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="Eaten" fill="#00ffaa" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
       </div>
 
       <div className="section mb-4">
@@ -207,6 +276,22 @@ const Dashboard = () => {
                 </div>
               </div>
               <button type="submit" className="btn btn-primary btn-full mt-2">Save Meal</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showWeightModal && (
+        <div className="modal-overlay">
+          <div className="modal-content glass-card">
+            <button className="modal-close" onClick={() => setShowWeightModal(false)}><X size={24} /></button>
+            <h2 className="mb-4">Log Current Weight</h2>
+            <form onSubmit={handleWeightSubmit}>
+              <div className="input-group mb-4">
+                <label className="input-label">Weight (lbs)</label>
+                <input type="number" className="input" required value={weightForm.current} onChange={e => setWeightForm({ current: e.target.value })} placeholder={user?.currentWeight} />
+              </div>
+              <button type="submit" className="btn btn-primary btn-full mt-2">Update Weight</button>
             </form>
           </div>
         </div>

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { useAuth } from '../App';
-import { LogOut, Settings, Award } from 'lucide-react';
+import { useAuth, useTheme } from '../App';
+import { LogOut, Settings, Award, Sun, Moon } from 'lucide-react';
 import './Profile.css';
 
 const Profile = () => {
   const { user, token, logout, setUser } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState({ name: user?.name, avatar: user?.avatar });
 
@@ -45,7 +46,13 @@ const Profile = () => {
 
   return (
     <div className="page profile-page">
-      <div className="profile-header text-center mb-4 cursor-pointer">
+      <div className="profile-header text-center mb-4 cursor-pointer" style={{ position: 'relative' }}>
+         <button 
+           onClick={toggleTheme} 
+           style={{ position: 'absolute', top: 0, right: 0, background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '8px' }}
+         >
+           {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+         </button>
         <div className="avatar-wrapper mb-2">
            <img src={user?.avatar} alt="Profile" className="profile-avatar" />
         </div>
