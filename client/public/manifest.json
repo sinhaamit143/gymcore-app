@@ -1,0 +1,21 @@
+{
+  "name": "GymCore Fitness App",
+  "short_name": "GymCore",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#161b22",
+  "theme_color": "#00ffaa",
+  "description": "Your ultimate fitness tracking and premium coaching app.",
+  "icons": [
+    {
+      "src": "logo192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "logo512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ]
+}
