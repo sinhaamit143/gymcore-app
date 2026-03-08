@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../App';
-import { Users, Trash2, Search, ShieldAlert } from 'lucide-react';
+import { Users, Trash2, Search, ShieldAlert, LogOut } from 'lucide-react';
 
 const Admin = () => {
-  const { token, user } = useAuth();
+  const { token, user, logout } = useAuth();
   const [usersList, setUsersList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -63,6 +63,9 @@ const Admin = () => {
           <h1 className="page-title mb-2" style={{ margin: 0 }}><ShieldAlert className="inline-icon text-accent" /> Admin Panel</h1>
           <p className="text-secondary" style={{ margin: 0 }}>Manage users and platform activity</p>
         </div>
+        <button onClick={logout} className="btn btn-secondary btn-sm" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+           <LogOut size={16} color="#ff4d4f" /> Logout
+        </button>
       </div>
 
       <div className="glass-card mb-4" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px' }}>

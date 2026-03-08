@@ -30,7 +30,7 @@ const Auth = () => {
       if (!res.ok) throw new Error(data.error || 'Authentication failed');
 
       login(data.user, data.token);
-      navigate('/');
+      navigate(data.user.role === 'admin' ? '/admin' : '/');
     } catch (err) {
       setError(err.message);
     } finally {

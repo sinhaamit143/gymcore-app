@@ -98,7 +98,7 @@ const AppLayout = ({ children }) => {
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
-  const hideNav = location.pathname === '/login';
+  const hideNav = location.pathname === '/login' || user?.role === 'admin';
 
   return (
     <div className="app-container">
