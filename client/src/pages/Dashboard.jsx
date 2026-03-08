@@ -115,12 +115,12 @@ const Dashboard = () => {
 
   return (
     <div className="page dashboard-page">
-      <div className="flex-between mb-4">
-        <div>
-          <h1 className="page-title mb-2">Hello, {user?.name.split(' ')[0]} 👋</h1>
-          <p className="text-secondary">Ready to crush your goals today?</p>
-        </div>
+      <div className="mb-4" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
         <img src={user?.avatar} alt="Profile" className="avatar-small" />
+        <div>
+          <h1 className="page-title" style={{ margin: 0, marginBottom: '4px' }}>Hello, {user?.name.split(' ')[0]} 👋</h1>
+          <p className="text-secondary" style={{ margin: 0 }}>Ready to crush your goals today?</p>
+        </div>
       </div>
 
       <div className="stats-grid mb-4">
