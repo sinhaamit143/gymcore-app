@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../App';
 import { LogOut, Settings, Award, CheckCircle, ShieldAlert, Bell } from 'lucide-react';
 import { Link } from 'react-router-dom';
