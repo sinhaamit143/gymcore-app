@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../App';
-import { Flame, Dumbbell, Apple, Plus, Calendar, X, Target, Edit2 } from 'lucide-react';
+import { Flame, Dumbbell, Apple, Plus, Calendar, X, Target, Edit2, Search } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import './Dashboard.css';
 
@@ -15,6 +15,37 @@ const Dashboard = () => {
   const [workoutForm, setWorkoutForm] = useState({ type: '', duration: '', calories: '' });
   const [nutritionForm, setNutritionForm] = useState({ meal: '', calories: '', protein: '', carbs: '', fat: '' });
   const [weightForm, setWeightForm] = useState({ current: '' });
+  const [isSearchingFood, setIsSearchingFood] = useState(false);
+
+  const searchFood = async () => {
+    if (!nutritionForm.meal) return;
+    setIsSearchingFood(true);
+    try {
+      const res = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(nutritionForm.meal)}&search_simple=1&action=process&json=1&page_size=1`);
+      const data = await res.json();
+      
+      if (data.products && data.products.length > 0) {
+        const product = data.products[0];
+        const nutriments = product.nutriments;
+        
+        setNutritionForm(prev => ({
+          ...prev,
+          meal: product.product_name || prev.meal,
+          calories: nutriments['energy-kcal_100g'] ? Math.round(nutriments['energy-kcal_100g']) : '',
+          protein: nutriments.proteins_100g ? Math.round(nutriments.proteins_100g) : '',
+          carbs: nutriments.carbohydrates_100g ? Math.round(nutriments.carbohydrates_100g) : '',
+          fat: nutriments.fat_100g ? Math.round(nutriments.fat_100g) : ''
+        }));
+      } else {
+        alert('Food not found in database. Please enter manually.');
+      }
+    } catch (err) {
+      console.error('Failed to search food', err);
+      alert('Search failed. Please enter manually.');
+    } finally {
+      setIsSearchingFood(false);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -252,8 +283,13 @@ const Dashboard = () => {
             <h2 className="mb-4">Log Meal</h2>
             <form onSubmit={handleNutritionSubmit}>
               <div className="input-group">
-                <label className="input-label">Meal Description</label>
-                <input type="text" className="input" required value={nutritionForm.meal} onChange={e => setNutritionForm({...nutritionForm, meal: e.target.value})} placeholder="e.g. Chicken Salad" />
+                <label className="input-label">Meal Description <span style={{fontSize: '11px', color: 'var(--text-secondary)'}}>(Type & Search)</span></label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                   <input type="text" className="input" required value={nutritionForm.meal} onChange={e => setNutritionForm({...nutritionForm, meal: e.target.value})} placeholder="e.g. Chicken breast" style={{ flex: 1 }} />
+                   <button type="button" className="btn btn-secondary" onClick={searchFood} disabled={isSearchingFood} style={{ padding: '0 15px' }}>
+                     {isSearchingFood ? '...' : <Search size={18} />}
+                   </button>
+                </div>
               </div>
               <div className="flex-between" style={{gap: '10px'}}>
                 <div className="input-group flex-1">

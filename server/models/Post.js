@@ -13,6 +13,7 @@ const postSchema = new mongoose.Schema({
   user_name: { type: String, required: true },
   user_avatar: { type: String, required: true },
   content: { type: String, required: true },
+  imageUrl: { type: String },
   likes: { type: Number, default: 0 },
   likedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   comments: [commentSchema]

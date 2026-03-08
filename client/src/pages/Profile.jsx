@@ -1,12 +1,24 @@
-import React, { useState } from 'react';
 import { useAuth } from '../App';
-import { LogOut, Settings, Award, CheckCircle } from 'lucide-react';
+import { LogOut, Settings, Award, CheckCircle, ShieldAlert, Bell } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import './Profile.css';
+
+const urlBase64ToUint8Array = (base64String) => {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+};
 
 const Profile = () => {
   const { user, token, logout, setUser } = useAuth();
   const [editMode, setEditMode] = useState(false);
   const [allServices, setAllServices] = useState([]);
+  const [myReels, setMyReels] = useState([]);
   const [formData, setFormData] = useState({ 
     name: user?.name || '',  
     avatar: user?.avatar || '',
@@ -31,18 +43,21 @@ const Profile = () => {
   };
 
   React.useEffect(() => {
-    const fetchServices = async () => {
+    const fetchServicesAndReels = async () => {
       try {
-        const res = await fetch('/api/services', { headers: { 'Authorization': `Bearer ${token}` } });
-        if (res.ok) {
-          const data = await res.json();
-          setAllServices(data);
+        const [servRes, postRes] = await Promise.all([
+          fetch('/api/services', { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch('/api/community/posts', { headers: { 'Authorization': `Bearer ${token}` } })
+        ]);
+        
+        if (servRes.ok) setAllServices(await servRes.json());
+        if (postRes.ok) {
+           const allPosts = await postRes.json();
+           setMyReels(allPosts.filter(p => p.user_id === user.id && p.imageUrl));
         }
       } catch (err) { console.error(err); }
     };
-    if (user?.purchasedServices?.length > 0) {
-      fetchServices();
-    }
+    if (user) fetchServicesAndReels();
   }, [token, user?.purchasedServices]);
 
   const handleUpdate = async (e) => {
@@ -62,6 +77,45 @@ const Profile = () => {
       }
     } catch (err) {
       console.error('Update failed', err);
+    }
+  };
+
+  const subscribeUserToPush = async () => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      alert('Push notifications not supported on your device/browser.');
+      return;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+         alert('Permission for notifications denied.');
+         return;
+      }
+
+      const swRegistration = await navigator.serviceWorker.ready;
+      
+      const keyRes = await fetch('/api/notifications/key');
+      const { publicKey } = await keyRes.json();
+
+      const subscription = await swRegistration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey)
+      });
+
+      await fetch('/api/notifications/subscribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(subscription)
+      });
+
+      alert('Successfully subscribed to Push Notifications!');
+    } catch (err) {
+      console.error('Failed subscribing to push', err);
+      alert('Failed to subscribe to notifications.');
     }
   };
 
@@ -147,6 +201,17 @@ const Profile = () => {
          )}
       </div>
 
+      {myReels.length > 0 && (
+        <div className="glass-card mb-4 section-settings">
+          <h3 className="mb-4">My Progress Reels</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '8px' }}>
+             {myReels.map(reel => (
+               <img key={reel.id} src={reel.imageUrl} alt="Progress" style={{ width: '100%', aspectRatio: '1/1', objectFit: 'cover', borderRadius: '8px', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)' }} />
+             ))}
+          </div>
+        </div>
+      )}
+
       {user?.purchasedServices?.length > 0 && (
         <div className="glass-card mb-4 section-settings">
           <h3 className="mb-4">My Subscriptions</h3>
@@ -162,6 +227,22 @@ const Profile = () => {
             ))}
           </div>
         </div>
+      )}
+
+      <div className="glass-card mb-4 section-settings text-center">
+         <h3 className="mb-2">Notifications</h3>
+         <p className="text-secondary mb-3" style={{ fontSize: '14px' }}>Get alerts for new community comments and app updates.</p>
+         <button onClick={subscribeUserToPush} className="btn btn-secondary btn-sm" style={{ width: '100%', display: 'flex', justifyContent: 'center', gap: '8px' }}>
+            <Bell size={16} /> Enable Push Notifications
+         </button>
+      </div>
+
+      {user?.role === 'admin' && (
+        <Link to="/admin" style={{ textDecoration: 'none' }}>
+          <button className="btn mb-4 btn-full" style={{ background: 'rgba(0, 255, 170, 0.1)', color: '#00ffaa', border: '1px solid rgba(0,255,170,0.3)', display: 'flex', justifyContent: 'center' }}>
+            <ShieldAlert size={18} style={{ marginRight: '8px' }} /> Admin Panel
+          </button>
+        </Link>
       )}
 
       <button className="btn btn-secondary btn-full logout-btn" onClick={logout}>

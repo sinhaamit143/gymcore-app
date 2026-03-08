@@ -7,6 +7,7 @@ const Community = () => {
   const { user, token } = useAuth();
   const [posts, setPosts] = useState([]);
   const [newPost, setNewPost] = useState('');
+  const [newImage, setNewImage] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeCommentPost, setActiveCommentPost] = useState(null);
   const [commentText, setCommentText] = useState('');
@@ -40,9 +41,10 @@ const Community = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}` 
         },
-        body: JSON.stringify({ content: newPost })
+        body: JSON.stringify({ content: newPost, imageUrl: newImage })
       });
       setNewPost('');
+      setNewImage(null);
       fetchPosts();
     } catch (err) {
       console.error(err);
@@ -98,8 +100,35 @@ const Community = () => {
             rows="2"
           />
         </div>
-        <div className="post-actions">
-          <button type="submit" className="btn btn-primary btn-sm" disabled={!newPost.trim()}>
+        
+        {newImage && (
+          <div style={{ margin: '10px 0 10px 52px', position: 'relative', display: 'inline-block' }}>
+             <img src={newImage} alt="Preview" style={{ height: '100px', borderRadius: '8px', objectFit: 'cover' }} />
+             <button type="button" onClick={() => setNewImage(null)} style={{ position: 'absolute', top: '-8px', right: '-8px', background: '#ff4d4f', border: 'none', borderRadius: '50%', width: '24px', height: '24px', color: '#fff', cursor: 'pointer' }}>×</button>
+          </div>
+        )}
+
+        <div className="post-actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: 'var(--text-secondary)' }}>
+              <input 
+                type="file" 
+                accept="image/*" 
+                style={{ display: 'none' }} 
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  if (file) {
+                    if (file.size > 10 * 1024 * 1024) return alert('File too large (max 10MB)');
+                    const reader = new FileReader();
+                    reader.onloadend = () => setNewImage(reader.result);
+                    reader.readAsDataURL(file);
+                  }
+                }}
+              />
+              <span className="btn btn-secondary btn-sm" style={{ padding: '6px 12px' }}>📷 Add Photo</span>
+            </label>
+          </div>
+          <button type="submit" className="btn btn-primary btn-sm" disabled={!newPost.trim() && !newImage}>
             <Send size={16} /> Post
           </button>
         </div>
@@ -118,6 +147,9 @@ const Community = () => {
               </div>
               <div className="post-content">
                 <p>{post.content}</p>
+                {post.imageUrl && (
+                  <img src={post.imageUrl} alt="User upload" style={{ width: '100%', maxHeight: '400px', objectFit: 'cover', borderRadius: '12px', marginTop: '12px' }} />
+                )}
               </div>
               <div className="post-footer" style={{ display: 'flex', gap: '16px' }}>
                 <button 

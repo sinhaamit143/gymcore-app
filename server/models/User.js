@@ -11,6 +11,7 @@ const userSchema = new mongoose.Schema({
   age: { type: Number },
   phone: { type: String, default: '' },
   bio: { type: String, default: '' },
+  role: { type: String, default: 'user' },
   purchasedServices: [{ type: Number }]
 }, { timestamps: true });
 

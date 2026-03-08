@@ -7,6 +7,7 @@ import Community from './pages/Community';
 import Leaderboard from './pages/Leaderboard';
 import Services from './pages/Services';
 import Profile from './pages/Profile';
+import Admin from './pages/Admin';
 import BottomNav from './components/BottomNav';
 import './index.css';
 
@@ -152,13 +153,17 @@ function App() {
             } />
             
             <Route path="/services" element={
-               <ProtectedRoute><Services /></ProtectedRoute>
+              <ProtectedRoute><Services /></ProtectedRoute>
             } />
             
             <Route path="/profile" element={
-               <ProtectedRoute><Profile /></ProtectedRoute>
+              <ProtectedRoute><Profile /></ProtectedRoute>
             } />
-
+            
+            <Route path="/admin" element={
+              <ProtectedRoute><Admin /></ProtectedRoute>
+            } />
+            
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </AppLayout>

@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
 const path = require('path');
+const webpush = require('web-push');
 
 const User = require('./models/User');
 const Workout = require('./models/Workout');
@@ -14,13 +15,23 @@ const Post = require('./models/Post');
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 const JWT_SECRET = process.env.JWT_SECRET || 'gym_app_secret_key_123';
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/gymcore';
 
+/* --- Web Push VAPID Keys --- */
+// Normally you'd keep these in .env. We'll generate them once on server start for prototype.
+const vapidKeys = webpush.generateVAPIDKeys();
+webpush.setVapidDetails(
+  'mailto:test@example.com',
+  vapidKeys.publicKey,
+  vapidKeys.privateKey
+);
+
 mongoose.connect(MONGO_URI)
-  .then(() => console.log('Connected to MongoDB'))
-  .catch(err => console.error('MongoDB connection error:', err));
+  .then(() => console.log('Connected to MongoDB safely!'))
+  .catch(err => console.log('MongoDB Hook Error:', err));
 
 mongoose.set('toJSON', {
   virtuals: true,
@@ -42,6 +53,16 @@ const authenticateToken = (req, res, next) => {
     req.user = user;
     next();
   });
+};
+
+const requireAdmin = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user || user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    next();
+  } catch (err) { res.status(500).json({ error: err.message }); }
 };
 
 const updatePoints = async (userId, pointsToAdd) => {
@@ -101,6 +122,44 @@ app.put('/api/user', authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// --- Admin Routes ---
+app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const users = await User.find().select('-password').sort({ createdAt: -1 });
+    res.json(users);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    await User.findByIdAndDelete(req.params.id);
+    await Workout.deleteMany({ user_id: req.params.id });
+    await Nutrition.deleteMany({ user_id: req.params.id });
+    res.json({ message: 'User deleted successfully' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- Push Notifications ---
+app.get('/api/notifications/key', (req, res) => {
+  res.json({ publicKey: vapidKeys.publicKey });
+});
+
+// We store the subscription locally in-memory for this prototype instance
+let fakeSubscriptions = [];
+app.post('/api/notifications/subscribe', authenticateToken, (req, res) => {
+  const subscription = req.body;
+  fakeSubscriptions.push(subscription);
+  
+  // Send a welcome notification
+  const payload = JSON.stringify({
+    title: 'Welcome to GymCore V7!',
+    body: 'You have successfully subscribed to Push Notifications.'
+  });
+
+  webpush.sendNotification(subscription, payload).catch(err => console.error(err));
+  res.status(201).json({});
+});
+
 // --- Workout/Nutrition Routes ---
 app.get('/api/workouts', authenticateToken, async (req, res) => {
   try {
@@ -149,7 +208,8 @@ app.post('/api/community/posts', authenticateToken, async (req, res) => {
       user_id: user._id,
       user_name: user.name,
       user_avatar: user.avatar,
-      content: req.body.content
+      content: req.body.content,
+      imageUrl: req.body.imageUrl || null
     });
     await post.save();
     res.json({ id: post._id, message: 'Post created!' });
