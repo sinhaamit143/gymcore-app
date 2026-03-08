@@ -133,3 +133,21 @@
   border-radius: 12px;
   border: 1px dashed rgba(255, 255, 255, 0.1);
 }
+
+/* --- Mobile Responsiveness --- */
+@media (max-width: 600px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .stat-card {
+    padding: 12px;
+  }
+  
+  .log-item {
+    gap: 10px;
+    padding: 10px 12px;
+  }
+}
+
