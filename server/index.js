@@ -39,10 +39,10 @@ mongoose.connect(MONGO_URI)
 
 const seedDatabase = async () => {
   try {
-    const userCount = await User.countDocuments();
-    if (userCount > 0) return;
+    const adminExists = await User.findOne({ email: 'admin@gymcore.com' });
+    if (adminExists) return;
 
-    console.log('🌱 Empty database detected. Seeding initial records...');
+    console.log('🌱 Admin missing. Seeding admin and test records...');
 
     const adminHash = await bcrypt.hash('admin123', 10);
     const adminUser = new User({
