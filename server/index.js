@@ -40,7 +40,14 @@ mongoose.connect(MONGO_URI)
 const seedDatabase = async () => {
   try {
     const adminExists = await User.findOne({ email: 'admin@gymcore.com' });
-    if (adminExists) return;
+    if (adminExists) {
+      if (adminExists.role !== 'admin') {
+        adminExists.role = 'admin';
+        await adminExists.save();
+        console.log('✅ Updated existing admin@gymcore.com to have Admin privileges!');
+      }
+      return;
+    }
 
     console.log('🌱 Admin missing. Seeding admin and test records...');
 
