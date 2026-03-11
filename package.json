@@ -1,0 +1,9 @@
+{
+  "name": "gymcore",
+  "version": "1.0.0",
+  "description": "Deployment configuration for Render",
+  "scripts": {
+    "build": "npm --prefix client install && npm --prefix client run build && npm --prefix server install",
+    "start": "npm --prefix server start"
+  }
+}
