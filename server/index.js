@@ -31,8 +31,68 @@ webpush.setVapidDetails(
 );
 
 mongoose.connect(MONGO_URI)
-  .then(() => console.log('Connected to MongoDB safely!'))
+  .then(() => {
+    console.log('Connected to MongoDB safely!');
+    seedDatabase();
+  })
   .catch(err => console.log('MongoDB Hook Error:', err));
+
+const seedDatabase = async () => {
+  try {
+    const userCount = await User.countDocuments();
+    if (userCount > 0) return;
+
+    console.log('🌱 Empty database detected. Seeding initial records...');
+
+    const adminHash = await bcrypt.hash('admin123', 10);
+    const adminUser = new User({
+      name: 'GymCore Admin',
+      email: 'admin@gymcore.com',
+      password: adminHash,
+      role: 'admin',
+      avatar: 'https://i.pravatar.cc/150?u=admin@gymcore.com'
+    });
+    await adminUser.save();
+
+    const userHash = await bcrypt.hash('password123', 10);
+    const testUser = new User({
+      name: 'Demo Athlete',
+      email: 'user@gymcore.com',
+      password: userHash,
+      avatar: 'https://i.pravatar.cc/150?u=user@gymcore.com',
+      points: 15
+    });
+    await testUser.save();
+
+    await Workout.create({
+      user_id: testUser._id,
+      type: 'Push Day (Chest, Shoulders, Triceps)',
+      duration: 60,
+      calories: 450
+    });
+
+    await Nutrition.create({
+      user_id: testUser._id,
+      meal: 'Grilled Chicken & Quinoa',
+      calories: 550,
+      protein: 55,
+      carbs: 60,
+      fat: 10
+    });
+
+    await Post.create({
+      user_id: testUser._id,
+      user_name: testUser.name,
+      user_avatar: testUser.avatar,
+      content: 'Just started using GymCore! This app is amazing! 💪',
+      likes: 12
+    });
+
+    console.log('✅ Database successfully seeded! Admin: admin@gymcore.com | Pass: admin123');
+  } catch (err) {
+    console.error('Seed Error:', err);
+  }
+};
 
 mongoose.set('toJSON', {
   virtuals: true,
