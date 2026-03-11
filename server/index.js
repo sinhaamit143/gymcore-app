@@ -138,6 +138,19 @@ app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) =>
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.put('/api/admin/users/:id/role', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    if (req.params.id === req.user.id) {
+       return res.status(400).json({ error: 'You cannot change your own role' });
+    }
+    const { role } = req.body;
+    if (!['user', 'admin'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
+    
+    await User.findByIdAndUpdate(req.params.id, { role });
+    res.json({ message: `User role updated to ${role}` });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.delete('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     await User.findByIdAndDelete(req.params.id);
