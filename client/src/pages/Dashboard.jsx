@@ -8,6 +8,7 @@ const Dashboard = () => {
   const { user, token } = useAuth();
   const [workouts, setWorkouts] = useState([]);
   const [nutrition, setNutrition] = useState([]);
+  const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showWorkoutModal, setShowWorkoutModal] = useState(false);
   const [showNutritionModal, setShowNutritionModal] = useState(false);
@@ -50,16 +51,19 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [workRes, nutrRes] = await Promise.all([
+        const [workRes, nutrRes, plansRes] = await Promise.all([
           fetch('/api/workouts', { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch('/api/nutrition', { headers: { 'Authorization': `Bearer ${token}` } })
+          fetch('/api/nutrition', { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch('/api/user/plans', { headers: { 'Authorization': `Bearer ${token}` } })
         ]);
         
         const workData = await workRes.json();
         const nutrData = await nutrRes.json();
+        const plansData = await plansRes.json();
         
         setWorkouts(workData);
         setNutrition(nutrData);
+        setPlans(plansData);
       } catch (err) {
         console.error(err);
       } finally {
@@ -175,6 +179,25 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      {plans.length > 0 && (
+        <div className="glass-card mb-4" style={{ border: '1px solid rgba(0,255,170,0.3)', background: 'linear-gradient(145deg, rgba(0,255,170,0.05), rgba(0,0,0,0.3))' }}>
+          <h3 className="mb-3 text-accent" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Target size={18} /> Coach's Corner
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {plans.map(p => (
+              <div key={p.id} style={{ background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '12px', borderLeft: '4px solid #00ffaa' }}>
+                <div className="flex-between mb-1">
+                  <span style={{ fontWeight: 'bold', fontSize: '16px' }}>{p.title}</span>
+                  <span style={{ fontSize: '11px', textTransform: 'uppercase', color: p.type === 'workout' ? '#ff4d4f' : '#00ffaa', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '12px' }}>{p.type} plan</span>
+                </div>
+                <div className="text-secondary" style={{ fontSize: '14px', lineHeight: '1.5' }}>{p.details}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {user?.targetWeight && (
         <div className="glass-card mb-4">

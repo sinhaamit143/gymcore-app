@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../App';
-import { Heart, MessageCircle, Send } from 'lucide-react';
+import { Heart, MessageCircle, Send, Trash2 } from 'lucide-react';
 import './Community.css';
 
 const Community = () => {
@@ -55,6 +55,17 @@ const Community = () => {
     try {
       await fetch(`/api/community/posts/${postId}/like`, {
         method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      fetchPosts();
+    } catch (err) { console.error(err); }
+  };
+
+  const handleDeletePost = async (postId) => {
+    if (!window.confirm("Delete this post?")) return;
+    try {
+      await fetch(`/api/community/posts/${postId}`, {
+        method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       fetchPosts();
@@ -138,12 +149,19 @@ const Community = () => {
         <div className="feed">
           {posts.map(post => (
             <div key={post.id} className="glass-card post-card mb-4">
-              <div className="post-header">
-                <img src={post.avatar} alt={post.name} className="post-avatar" />
-                <div>
-                  <h4 className="post-author">{post.name}</h4>
-                  <p className="post-time">{formatTime(post.timestamp)}</p>
+              <div className="post-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <img src={post.avatar} alt={post.name} className="post-avatar" />
+                  <div>
+                    <h4 className="post-author">{post.name}</h4>
+                    <p className="post-time">{formatTime(post.timestamp)}</p>
+                  </div>
                 </div>
+                {(user?.role === 'admin' || post.user_id === user?.id) && (
+                  <button onClick={() => handleDeletePost(post.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
+                    <Trash2 size={16} color="#ff4d4f" />
+                  </button>
+                )}
               </div>
               <div className="post-content">
                 <p>{post.content}</p>

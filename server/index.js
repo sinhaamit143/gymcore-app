@@ -11,6 +11,7 @@ const User = require('./models/User');
 const Workout = require('./models/Workout');
 const Nutrition = require('./models/Nutrition');
 const Post = require('./models/Post');
+const AssignedPlan = require('./models/AssignedPlan');
 
 const app = express();
 app.use(cors());
@@ -122,6 +123,13 @@ app.put('/api/user', authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get('/api/user/plans', authenticateToken, async (req, res) => {
+  try {
+    const plans = await AssignedPlan.find({ user_id: req.user.id }).sort({ createdAt: -1 });
+    res.json(plans);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // --- Admin Routes ---
 app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
   try {
@@ -136,6 +144,46 @@ app.delete('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, 
     await Workout.deleteMany({ user_id: req.params.id });
     await Nutrition.deleteMany({ user_id: req.params.id });
     res.json({ message: 'User deleted successfully' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/admin/users/:id/details', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select('-password');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const workouts = await Workout.find({ user_id: user._id }).sort({ date: -1 }).limit(10);
+    const nutrition = await Nutrition.find({ user_id: user._id }).sort({ date: -1 }).limit(10);
+    const plans = await AssignedPlan.find({ user_id: user._id }).sort({ createdAt: -1 });
+    res.json({ user, workouts, nutrition, plans });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/admin/assign-plan', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { user_id, type, title, details } = req.body;
+    const plan = new AssignedPlan({
+      user_id,
+      admin_id: req.user.id,
+      type,
+      title,
+      details
+    });
+    await plan.save();
+    res.status(201).json(plan);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/admin/announce', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { title, body } = req.body;
+    const payload = JSON.stringify({ title, body });
+    
+    // Broadcast to all active subscriptions
+    fakeSubscriptions.forEach(sub => {
+      webpush.sendNotification(sub, payload).catch(err => console.error('Push failed', err));
+    });
+    
+    res.status(200).json({ message: `Announcement sent to ${fakeSubscriptions.length} devices.` });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -250,6 +298,21 @@ app.post('/api/community/posts/:id/comment', authenticateToken, async (req, res)
       { new: true }
     );
     res.json(post.comments[post.comments.length - 1]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/community/posts/:id', authenticateToken, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+    
+    const user = await User.findById(req.user.id);
+    if (post.user_id.toString() !== req.user.id && user.role !== 'admin') {
+      return res.status(403).json({ error: 'Unauthorized to delete this post' });
+    }
+    
+    await Post.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Post deleted successfully' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
