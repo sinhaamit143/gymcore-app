@@ -104,7 +104,7 @@ const Profile = () => {
         applicationServerKey: urlBase64ToUint8Array(publicKey)
       });
 
-      await fetch('/api/notifications/subscribe', {
+      const res = await fetch('/api/notifications/subscribe', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -112,8 +112,13 @@ const Profile = () => {
         },
         body: JSON.stringify(subscription)
       });
-
-      alert('Successfully subscribed to Push Notifications!');
+      
+      if (res.ok) {
+        setUser({ ...user, pushSubscription: subscription });
+        alert('Push Notifications enabled and saved to your account!');
+      } else {
+        throw new Error('Failed to save subscription');
+      }
     } catch (err) {
       console.error('Failed subscribing to push', err);
       alert('Failed to subscribe to notifications.');
@@ -126,7 +131,14 @@ const Profile = () => {
         <div className="avatar-wrapper mb-2">
            <img src={user?.avatar} alt="Profile" className="profile-avatar" />
         </div>
-        <h1 className="profile-name">{user?.name}</h1>
+        <h1 className="profile-name">
+          {user?.name} 
+          {user?.subscriptionPlan === 'elite' && (
+            <span className="elite-badge-inline" title="Elite Member Status">
+               <ShieldAlert size={14} fill="#00ffaa" color="#000" style={{ marginLeft: '8px' }} />
+            </span>
+          )}
+        </h1>
         <p className="text-secondary">{user?.email}</p>
         <div className="points-badge mt-2">
            <Award size={16} className="text-accent"/> {user?.points} Points Total
@@ -218,9 +230,11 @@ const Profile = () => {
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Award size={18} className="text-accent" /> Membership Tier
           </h3>
-          <Link to="/pricing">
-            <button className="btn btn-primary btn-sm">Upgrade Plan</button>
-          </Link>
+          {user?.subscriptionPlan !== 'elite' && (
+            <Link to="/pricing">
+              <button className="btn btn-primary btn-sm">Upgrade Plan</button>
+            </Link>
+          )}
         </div>
         <div className="info-display">
           <div className="info-row">
@@ -236,6 +250,20 @@ const Profile = () => {
             </span>
           </div>
         </div>
+
+        {user?.subscriptionPlan === 'elite' && (
+          <div className="elite-features-box mt-4 animate-fade-in" style={{ background: 'rgba(0, 255, 170, 0.05)', border: '1px solid rgba(0, 255, 170, 0.2)', padding: '16px', borderRadius: '12px' }}>
+             <h4 style={{ color: '#00ffaa', marginBottom: '12px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+               <ShieldAlert size={16} /> Elite Member Privileges
+             </h4>
+             <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle size={14} color="#00ffaa" /> Custom 1-on-1 Workout Plans</li>
+                <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle size={14} color="#00ffaa" /> Personalized Meal Plans</li>
+                <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle size={14} color="#00ffaa" /> VIP Event Access</li>
+                <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle size={14} color="#00ffaa" /> Global Recognition Badge</li>
+             </ul>
+          </div>
+        )}
       </div>
 
       {user?.purchasedServices?.length > 0 && (
@@ -258,8 +286,20 @@ const Profile = () => {
       <div className="glass-card mb-4 section-settings text-center">
          <h3 className="mb-2">Notifications</h3>
          <p className="text-secondary mb-3" style={{ fontSize: '14px' }}>Get alerts for new community comments and app updates.</p>
-         <button onClick={subscribeUserToPush} className="btn btn-secondary btn-sm" style={{ width: '100%', display: 'flex', justifyContent: 'center', gap: '8px' }}>
-            <Bell size={16} /> Enable Push Notifications
+         <button 
+           onClick={subscribeUserToPush} 
+           className="btn btn-secondary btn-sm" 
+           style={{ 
+             width: '100%', 
+             display: 'flex', 
+             justifyContent: 'center', 
+             gap: '8px',
+             color: user?.pushSubscription ? '#00ffaa' : 'inherit',
+             borderColor: user?.pushSubscription ? 'rgba(0,255,170,0.3)' : 'inherit'
+           }}
+           disabled={!!user?.pushSubscription}
+         >
+            <Bell size={16} /> {user?.pushSubscription ? 'Notifications Enabled' : 'Enable Push Notifications'}
          </button>
       </div>
 

@@ -8,7 +8,7 @@ const BottomNav = () => {
     { name: 'Dashboard', path: '/', icon: <LayoutDashboard size={24} /> },
     { name: 'Community', path: '/community', icon: <Users size={24} /> },
     { name: 'Ranks', path: '/leaderboard', icon: <Trophy size={24} /> },
-    { name: 'Premium', path: '/services', icon: <Store size={24} /> },
+    { name: 'Shop', path: '/shop', icon: <Store size={24} /> },
     { name: 'Profile', path: '/profile', icon: <User size={24} /> },
   ];
 

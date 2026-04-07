@@ -1,33 +1,47 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../App';
-import { Users, Trash2, Search, ShieldAlert, LogOut, Bell, X, Activity, Plus, Shield, ArrowRight } from 'lucide-react';
+import { 
+  Users, Trash2, Search, ShieldAlert, LogOut, Bell, X, Activity, 
+  Plus, Shield, ArrowRight, ShoppingBag, Tag, DollarSign, Package 
+} from 'lucide-react';
 
 const Admin = () => {
   const { token, user: currentUser, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'members'
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'members' | 'inventory'
   
   const [usersList, setUsersList] = useState([]);
+  const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [announcement, setAnnouncement] = useState({ title: '', body: '' });
   
+  // Product Form State
+  const [productForm, setProductForm] = useState({
+    name: '',
+    description: '',
+    price: '',
+    category: 'Supplements',
+    image: ''
+  });
+
   // Modal state
   const [selectedUser, setSelectedUser] = useState(null);
   const [userDetails, setUserDetails] = useState(null);
   const [planForm, setPlanForm] = useState({ type: 'workout', title: '', details: '' });
 
   useEffect(() => {
-    fetchUsers();
+    fetchData();
   }, []);
 
-  const fetchUsers = async () => {
+  const fetchData = async () => {
+    setLoading(true);
     try {
-      const res = await fetch('/api/admin/users', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        setUsersList(await res.json());
-      }
+      const [uRes, pRes] = await Promise.all([
+        fetch('/api/admin/users', { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch('/api/products', { headers: { 'Authorization': `Bearer ${token}` } })
+      ]);
+      if (uRes.ok) setUsersList(await uRes.json());
+      if (pRes.ok) setProducts(await pRes.json());
     } catch (err) {
       console.error(err);
     } finally {
@@ -35,7 +49,7 @@ const Admin = () => {
     }
   };
 
-  const handleDelete = async (id, e) => {
+  const handleDeleteUser = async (id, e) => {
     e.stopPropagation();
     if (!window.confirm("Are you sure you want to permanently delete this user?")) return;
     try {
@@ -46,9 +60,7 @@ const Admin = () => {
       if (res.ok) {
         setUsersList(prev => prev.filter(u => u.id !== id));
       }
-    } catch (err) {
-      console.error(err);
-    }
+    } catch (err) { console.error(err); }
   };
 
   const handleRoleToggle = async (id, currentRole, e) => {
@@ -56,7 +68,7 @@ const Admin = () => {
     const newRole = currentRole === 'admin' ? 'user' : 'admin';
     const msg = newRole === 'admin' 
       ? "Promote this user to Admin/Trainer?" 
-      : "Revoke Admin privileges for this user?";
+      : "Revoke Admin privileges and demote to regular User?";
       
     if (!window.confirm(msg)) return;
     
@@ -72,9 +84,39 @@ const Admin = () => {
       
       if (res.ok) {
         setUsersList(prev => prev.map(u => u.id === id ? { ...u, role: newRole } : u));
-      } else {
-        const data = await res.json();
-        alert(data.error || 'Failed to update role');
+      }
+    } catch (err) { console.error(err); }
+  };
+
+  const handleAddProduct = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/products', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify(productForm)
+      });
+      if (res.ok) {
+        const newProduct = await res.json();
+        setProducts([newProduct, ...products]);
+        setProductForm({ name: '', description: '', price: '', category: 'Supplements', image: '' });
+        alert('Product added to shop!');
+      }
+    } catch (err) { console.error(err); }
+  };
+
+  const handleDeleteProduct = async (id) => {
+    if (!window.confirm("Delete this product from shop?")) return;
+    try {
+      const res = await fetch(`/api/products/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setProducts(prev => prev.filter(p => p.id !== id));
       }
     } catch (err) { console.error(err); }
   };
@@ -142,7 +184,6 @@ const Admin = () => {
   }
 
   const filteredUsers = usersList.filter(u => u.name.toLowerCase().includes(searchTerm.toLowerCase()) || u.email.toLowerCase().includes(searchTerm.toLowerCase()));
-  const adminCount = usersList.filter(u => u.role === 'admin').length;
 
   return (
     <div className="page" style={{ paddingBottom: '100px', maxWidth: '1000px', margin: '0 auto' }}>
@@ -150,7 +191,7 @@ const Admin = () => {
       <div className="flex-between mb-4">
         <div>
           <h1 className="page-title mb-2" style={{ margin: 0 }}><ShieldAlert className="inline-icon text-accent" /> Control Center</h1>
-          <p className="text-secondary" style={{ margin: 0 }}>V9 Coaching & Network Administration</p>
+          <p className="text-secondary" style={{ margin: 0 }}>V11 Coaching, Shop & Network Admin</p>
         </div>
         <button onClick={logout} className="btn btn-secondary btn-sm" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
            <LogOut size={16} color="#ff4d4f" /> Logout
@@ -158,41 +199,23 @@ const Admin = () => {
       </div>
 
       {/* Modern Tabs */}
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>
-        <button 
-          onClick={() => setActiveTab('overview')}
-          style={{ 
-            background: 'none', 
-            border: 'none', 
-            color: activeTab === 'overview' ? '#00ffaa' : 'var(--text-secondary)',
-            fontSize: '16px',
-            fontWeight: activeTab === 'overview' ? 'bold' : 'normal',
-            cursor: 'pointer',
-            padding: '8px 16px',
-            borderRadius: '8px',
-            backgroundColor: activeTab === 'overview' ? 'rgba(0,255,170,0.1)' : 'transparent',
-            transition: 'all 0.2s'
-          }}
-        >
-          Activity Overview
-        </button>
-        <button 
-          onClick={() => setActiveTab('members')}
-          style={{ 
-            background: 'none', 
-            border: 'none', 
-            color: activeTab === 'members' ? '#00ffaa' : 'var(--text-secondary)',
-            fontSize: '16px',
-            fontWeight: activeTab === 'members' ? 'bold' : 'normal',
-            cursor: 'pointer',
-            padding: '8px 16px',
-            borderRadius: '8px',
-            backgroundColor: activeTab === 'members' ? 'rgba(0,255,170,0.1)' : 'transparent',
-            transition: 'all 0.2s'
-          }}
-        >
-          Member Relations
-        </button>
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '24px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px', overflowX: 'auto' }}>
+        {['overview', 'members', 'inventory'].map(tab => (
+           <button 
+             key={tab}
+             onClick={() => setActiveTab(tab)}
+             style={{ 
+               background: 'none', border: 'none', 
+               color: activeTab === tab ? '#00ffaa' : 'var(--text-secondary)',
+               fontSize: '14px', fontWeight: activeTab === tab ? 'bold' : 'normal',
+               cursor: 'pointer', padding: '8px 16px', borderRadius: '8px',
+               backgroundColor: activeTab === tab ? 'rgba(0,255,170,0.1)' : 'transparent',
+               transition: 'all 0.2s', whiteSpace: 'nowrap', textTransform: 'capitalize'
+             }}
+           >
+             {tab === 'inventory' ? 'Shop Inventory' : (tab === 'members' ? 'Member Relations' : 'Overview')}
+           </button>
+        ))}
       </div>
 
       {/* OVERVIEW TAB */}
@@ -205,14 +228,14 @@ const Admin = () => {
                 <div className="text-secondary" style={{ fontSize: '14px' }}>Registered Athletes</div>
              </div>
              <div className="glass-card text-center" style={{ padding: '24px' }}>
-                <Activity size={28} className="text-accent mb-3 mx-auto" />
-                <div style={{ fontSize: '32px', fontWeight: 'bold' }}>{usersList.reduce((acc, u) => acc + u.points, 0) / 10}</div>
-                <div className="text-secondary" style={{ fontSize: '14px' }}>Platform Logs</div>
+                <Package size={28} className="text-accent mb-3 mx-auto" />
+                <div style={{ fontSize: '32px', fontWeight: 'bold' }}>{products.length}</div>
+                <div className="text-secondary" style={{ fontSize: '14px' }}>Shop Products</div>
              </div>
              <div className="glass-card text-center" style={{ padding: '24px' }}>
                 <Shield size={28} className="text-accent mb-3 mx-auto" />
-                <div style={{ fontSize: '32px', fontWeight: 'bold' }}>{adminCount}</div>
-                <div className="text-secondary" style={{ fontSize: '14px' }}>Active Staff/Trainers</div>
+                <div style={{ fontSize: '32px', fontWeight: 'bold' }}>{usersList.filter(u => u.role === 'admin').length}</div>
+                <div className="text-secondary" style={{ fontSize: '14px' }}>Active Staff</div>
              </div>
           </div>
 
@@ -220,21 +243,8 @@ const Admin = () => {
              <h3 className="mb-3" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Bell size={18} className="text-accent"/> Global Push Announcement</h3>
              <p className="text-secondary mb-4" style={{ fontSize: '14px' }}>Send an instant notification to all user devices.</p>
              <form onSubmit={handleAnnounce} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <input 
-                  className="input" 
-                  placeholder="Announcement Title" 
-                  value={announcement.title}
-                  onChange={e => setAnnouncement({...announcement, title: e.target.value})}
-                  required
-                />
-                <textarea 
-                  className="input" 
-                  placeholder="Message body..." 
-                  rows="3"
-                  value={announcement.body}
-                  onChange={e => setAnnouncement({...announcement, body: e.target.value})}
-                  required
-                ></textarea>
+                <input className="input" placeholder="Announcement Title" value={announcement.title} onChange={e => setAnnouncement({...announcement, title: e.target.value})} required />
+                <textarea className="input" placeholder="Message body..." rows="3" value={announcement.body} onChange={e => setAnnouncement({...announcement, body: e.target.value})} required></textarea>
                 <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-start' }}>Broadcast Announcement</button>
              </form>
           </div>
@@ -247,69 +257,120 @@ const Admin = () => {
           <div className="glass-card mb-4" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px' }}>
             <Search size={18} className="text-secondary" />
             <input 
-              type="text" 
-              placeholder="Search by name or email..." 
+              type="text" placeholder="Search athletes..." 
               style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: '16px', outline: 'none', width: '100%' }}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
 
           <div className="glass-card section-settings" style={{ padding: 0, overflow: 'hidden' }}>
-            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '16px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '10px', fontSize: '12px', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
+            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '16px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr auto', gap: '10px', fontSize: '12px', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
               <span>User Base</span>
+              <span>Subscription</span>
               <span>Authorization</span>
-              <span>Engagement</span>
-              <span>CRM Actions</span>
+              <span>Actions</span>
             </div>
             
             {filteredUsers.map(u => (
-              <div key={u.id} className="admin-list-item" onClick={() => openUserDetails(u)} style={{ cursor: 'pointer', padding: '16px', display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '10px', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.2s' }}>
+              <div key={u.id} className="admin-list-item" onClick={() => openUserDetails(u)} style={{ cursor: 'pointer', padding: u.id === currentUser.id ? '16px' : '12px 16px', display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr auto', gap: '10px', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.2s' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', overflow: 'hidden' }}>
-                  <img src={u.avatar} alt="avatar" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
+                  <img src={u.avatar} alt="avatar" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} />
                   <div style={{ overflow: 'hidden' }}>
-                    <div style={{ fontWeight: '500', color: '#fff', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{u.name} {u.id === currentUser.id ? '(You)' : ''}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{u.email}</div>
+                    <div style={{ fontWeight: '500', color: '#fff', fontSize: '14px' }}>{u.name} {u.id === currentUser.id ? '(You)' : ''}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{u.email}</div>
                   </div>
                 </div>
                 
-                <div>
-                  <span style={{ 
-                    padding: '4px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase',
-                    background: u.role === 'admin' ? 'rgba(0, 255, 170, 0.1)' : 'rgba(255,255,255,0.05)',
-                    color: u.role === 'admin' ? '#00ffaa' : 'var(--text-secondary)'
-                  }}>
-                    {u.role}
-                  </span>
+                <div style={{ display: 'flex' }}>
+                   <span style={{ 
+                     padding: '2px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase',
+                     background: u.subscriptionPlan === 'elite' ? 'rgba(0, 255, 170, 0.1)' : (u.subscriptionPlan === 'pro' ? 'rgba(0, 163, 255, 0.1)' : 'rgba(255,255,255,0.05)'),
+                     color: u.subscriptionPlan === 'elite' ? '#00ffaa' : (u.subscriptionPlan === 'pro' ? '#00a3ff' : 'var(--text-secondary)')
+                   }}>
+                     {u.subscriptionPlan || 'Free'}
+                   </span>
                 </div>
 
-                <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{u.points} pts</div>
+                <div>
+                   <span style={{ fontSize: '12px', color: u.role === 'admin' ? '#00ffaa' : 'var(--text-secondary)' }}>{u.role}</span>
+                </div>
 
                 <div style={{ display: 'flex', gap: '8px' }}>
                   {u.id !== currentUser.id && (
-                    <button 
-                      onClick={(e) => handleRoleToggle(u.id, u.role, e)}
-                      title={u.role === 'admin' ? "Demote to User" : "Promote to Admin"}
-                      style={{ background: 'rgba(0, 163, 255, 0.1)', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }}>
-                      <Shield size={16} color="#00a3ff" />
-                    </button>
+                    <>
+                      <button 
+                        onClick={(e) => handleRoleToggle(u.id, u.role, e)}
+                        title={u.role === 'admin' ? "Demote to User" : "Promote to Admin"}
+                        style={{ background: 'rgba(255, 255, 255, 0.05)', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer' }}>
+                        {u.role === 'admin' ? <ShieldAlert size={14} color="#ff4d4f" /> : <Shield size={14} color="#00ffaa" />}
+                      </button>
+                      <button 
+                        onClick={(e) => handleDeleteUser(u.id, e)}
+                        style={{ background: 'rgba(255, 77, 79, 0.05)', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer' }}>
+                        <Trash2 size={14} color="#ff4d4f" />
+                      </button>
+                    </>
                   )}
-                  {u.id !== currentUser.id && (
-                    <button 
-                      onClick={(e) => handleDelete(u.id, e)}
-                      title="Permanently Delete User"
-                      style={{ background: 'rgba(255, 77, 79, 0.1)', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }}>
-                      <Trash2 size={16} color="#ff4d4f" />
-                    </button>
-                  )}
-                  <button 
-                    style={{ background: 'rgba(255, 255, 255, 0.05)', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <ArrowRight size={16} color="var(--text-secondary)" />
+                  <button style={{ background: 'rgba(255, 255, 255, 0.05)', border: 'none', padding: '6px', borderRadius: '6px' }}>
+                    <ArrowRight size={14} color="var(--text-secondary)" />
                   </button>
                 </div>
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* INVENTORY TAB */}
+      {activeTab === 'inventory' && (
+        <div className="animate-fade-in">
+           <div className="glass-card mb-6" style={{ padding: '24px' }}>
+              <h3 className="mb-4" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Plus size={20} className="text-accent"/> List New Product</h3>
+              <form onSubmit={handleAddProduct} style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+                 <div className="input-group">
+                    <label className="input-label">Product Name</label>
+                    <input className="input" placeholder="e.g. Whey Gold Standard" value={productForm.name} onChange={e => setProductForm({...productForm, name: e.target.value})} required />
+                 </div>
+                 <div className="input-group">
+                    <label className="input-label">Price ($)</label>
+                    <input type="number" className="input" placeholder="49.99" value={productForm.price} onChange={e => setProductForm({...productForm, price: e.target.value})} required />
+                 </div>
+                 <div className="input-group">
+                    <label className="input-label">Category</label>
+                    <select className="input" value={productForm.category} onChange={e => setProductForm({...productForm, category: e.target.value})}>
+                       <option>Supplements</option>
+                       <option>Gym Wear</option>
+                       <option>Accessories</option>
+                       <option>Equipments</option>
+                    </select>
+                 </div>
+                 <div className="input-group">
+                    <label className="input-label">Image URL</label>
+                    <input className="input" placeholder="https://..." value={productForm.image} onChange={e => setProductForm({...productForm, image: e.target.value})} required />
+                 </div>
+                 <div className="input-group" style={{ gridColumn: 'span 2' }}>
+                    <label className="input-label">Description</label>
+                    <textarea className="input" rows="2" placeholder="Brief product summary..." value={productForm.description} onChange={e => setProductForm({...productForm, description: e.target.value})} required></textarea>
+                 </div>
+                 <button type="submit" className="btn btn-primary" style={{ gridColumn: 'span 2' }}>Add to Shop Catalog</button>
+              </form>
+           </div>
+
+           <div className="glass-card section-settings" style={{ padding: 0 }}>
+             <h3 style={{ padding: '20px 20px 10px' }}>Current Inventory ({products.length})</h3>
+             {products.map(p => (
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                   <img src={p.image} alt={p.name} style={{ width: '50px', height: '50px', borderRadius: '8px', objectFit: 'cover' }} />
+                   <div style={{ flexGrow: 1 }}>
+                      <div style={{ fontWeight: 'bold' }}>{p.name}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{p.category} | ${p.price.toFixed(2)}</div>
+                   </div>
+                   <button onClick={() => handleDeleteProduct(p.id)} style={{ background: 'rgba(255,77,79,0.1)', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer' }}>
+                      <Trash2 size={16} color="#ff4d4f" />
+                   </button>
+                </div>
+             ))}
+           </div>
         </div>
       )}
 
@@ -329,9 +390,14 @@ const Admin = () => {
                  <div>
                     <h2 style={{ margin: 0, fontSize: '24px' }}>{selectedUser.name}</h2>
                     <p className="text-secondary" style={{ margin: '4px 0 0 0' }}>{selectedUser.email}</p>
-                    <span style={{ display: 'inline-block', marginTop: '8px', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', background: selectedUser.role === 'admin' ? 'rgba(0, 255, 170, 0.1)' : 'rgba(255,255,255,0.05)', color: selectedUser.role === 'admin' ? '#00ffaa' : 'var(--text-secondary)' }}>
-                      {selectedUser.role} Account
-                    </span>
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                      <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
+                        {selectedUser.role} Account
+                      </span>
+                      <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', background: 'rgba(0,255,170,0.1)', color: '#00ffaa' }}>
+                        {selectedUser.subscriptionPlan || 'Free'} Plan
+                      </span>
+                    </div>
                  </div>
               </div>
 
@@ -354,32 +420,12 @@ const Admin = () => {
                   <div className="mb-4" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', padding: '24px', borderRadius: '16px' }}>
                      <h3 className="mb-3" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '18px' }}><Plus size={20} className="text-accent" /> Assign Trainer Plan</h3>
                      <form onSubmit={handleAssignPlan} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        <select 
-                          className="input" 
-                          value={planForm.type}
-                          onChange={e => setPlanForm({...planForm, type: e.target.value})}
-                          style={{ padding: '14px' }}
-                        >
+                        <select className="input" value={planForm.type} onChange={e => setPlanForm({...planForm, type: e.target.value})} style={{ padding: '14px' }}>
                            <option value="workout">Workout Routine</option>
                            <option value="meal">Nutritional Plan</option>
                         </select>
-                        <input 
-                          className="input" 
-                          placeholder="Plan Title (e.g. Hypertrophy Phase 1)" 
-                          value={planForm.title}
-                          onChange={e => setPlanForm({...planForm, title: e.target.value})}
-                          style={{ padding: '14px' }}
-                          required
-                        />
-                        <textarea 
-                          className="input" 
-                          placeholder="Provide detailed instructions, sets, reps, or macros..." 
-                          rows="4"
-                          value={planForm.details}
-                          onChange={e => setPlanForm({...planForm, details: e.target.value})}
-                          style={{ padding: '14px' }}
-                          required
-                        ></textarea>
+                        <input className="input" placeholder="Title (e.g. Hypertrophy Phase 1)" value={planForm.title} onChange={e => setPlanForm({...planForm, title: e.target.value})} required style={{ padding: '14px' }} />
+                        <textarea className="input" placeholder="Instructions, sets, reps, or macros..." rows="4" value={planForm.details} onChange={e => setPlanForm({...planForm, details: e.target.value})} required style={{ padding: '14px' }}></textarea>
                         <button type="submit" className="btn btn-primary btn-full mt-2">Issue Plan to {selectedUser.name.split(' ')[0]}</button>
                      </form>
                   </div>
@@ -415,3 +461,4 @@ const Admin = () => {
 };
 
 export default Admin;
+

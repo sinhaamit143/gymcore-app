@@ -12,6 +12,7 @@ const Workout = require('./models/Workout');
 const Nutrition = require('./models/Nutrition');
 const Post = require('./models/Post');
 const AssignedPlan = require('./models/AssignedPlan');
+const Product = require('./models/Product');
 
 const app = express();
 app.use(cors());
@@ -271,15 +272,16 @@ app.post('/api/admin/assign-plan', authenticateToken, requireAdmin, async (req, 
 
 app.post('/api/admin/announce', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { title, body } = req.body;
     const payload = JSON.stringify({ title, body });
     
-    // Broadcast to all active subscriptions
-    fakeSubscriptions.forEach(sub => {
-      webpush.sendNotification(sub, payload).catch(err => console.error('Push failed', err));
+    // Broadcast to all active subscriptions in the database
+    const usersWithSubs = await User.find({ pushSubscription: { $exists: true, $ne: null } });
+    
+    usersWithSubs.forEach(user => {
+      webpush.sendNotification(user.pushSubscription, payload).catch(err => console.error('Push failed for user', user.email, err));
     });
     
-    res.status(200).json({ message: `Announcement sent to ${fakeSubscriptions.length} devices.` });
+    res.status(200).json({ message: `Announcement sent to ${usersWithSubs.length} devices.` });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -288,20 +290,20 @@ app.get('/api/notifications/key', (req, res) => {
   res.json({ publicKey: vapidKeys.publicKey });
 });
 
-// We store the subscription locally in-memory for this prototype instance
-let fakeSubscriptions = [];
-app.post('/api/notifications/subscribe', authenticateToken, (req, res) => {
-  const subscription = req.body;
-  fakeSubscriptions.push(subscription);
-  
-  // Send a welcome notification
-  const payload = JSON.stringify({
-    title: 'Welcome to GymCore V7!',
-    body: 'You have successfully subscribed to Push Notifications.'
-  });
+app.post('/api/notifications/subscribe', authenticateToken, async (req, res) => {
+  try {
+    const subscription = req.body;
+    await User.findByIdAndUpdate(req.user.id, { pushSubscription: subscription });
+    
+    // Send a welcome notification
+    const payload = JSON.stringify({
+      title: 'Welcome to GymCore V11!',
+      body: 'You have successfully subscribed to Push Notifications. Your subscription is now secured in our database.'
+    });
 
-  webpush.sendNotification(subscription, payload).catch(err => console.error(err));
-  res.status(201).json({});
+    webpush.sendNotification(subscription, payload).catch(err => console.error(err));
+    res.status(201).json({ message: 'Subscribed successfully' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // --- Workout/Nutrition Routes ---
@@ -412,7 +414,29 @@ app.delete('/api/community/posts/:id', authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- Leaderboard & Services ---
+// --- Shop / Inventory Routes ---
+app.get('/api/products', authenticateToken, async (req, res) => {
+  try {
+    const products = await Product.find().sort({ category: 1, name: 1 });
+    res.json(products);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/products', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const product = new Product(req.body);
+    await product.save();
+    res.status(201).json(product);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/products/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    await Product.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Product deleted' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/leaderboard', authenticateToken, async (req, res) => {
   try {
     const topUsers = await User.find()
@@ -422,14 +446,6 @@ app.get('/api/leaderboard', authenticateToken, async (req, res) => {
     
     res.json(topUsers);
   } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.get('/api/services', authenticateToken, (req, res) => {
-  res.json([
-    { id: 1, title: '1-on-1 Personal Training', description: 'Get a dedicated coach to accelerate your progress with customized workout plans and form correction.', price: 49.99, image: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80' },
-    { id: 2, title: 'Custom Nutrition Plan', description: 'A 4-week meal plan tailored to your body type, allergies, and specific fitness goals.', price: 29.99, image: 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80' },
-    { id: 3, title: 'Premium Supplements Stack', description: 'Our top-tier whey protein and pre-workout bundle for maximum recovery.', price: 89.99, image: 'https://images.unsplash.com/photo-1593095948071-474c5cc2989d?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80' }
-  ]);
 });
 
 app.use((req, res) => res.sendFile(path.join(__dirname, '../client/dist/index.html')));

@@ -14,7 +14,8 @@ const userSchema = new mongoose.Schema({
   role: { type: String, default: 'user' },
   purchasedServices: [{ type: Number }],
   subscriptionPlan: { type: String, default: 'free' },
-  subscriptionStatus: { type: String, default: 'active' }
+  subscriptionStatus: { type: String, default: 'active' },
+  pushSubscription: { type: Object }
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);

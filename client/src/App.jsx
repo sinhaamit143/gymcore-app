@@ -5,7 +5,7 @@ import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
 import Community from './pages/Community';
 import Leaderboard from './pages/Leaderboard';
-import Services from './pages/Services';
+import Shop from './pages/Shop';
 import Profile from './pages/Profile';
 import Admin from './pages/Admin';
 import Pricing from './pages/Pricing';
@@ -153,8 +153,8 @@ function App() {
                <ProtectedRoute><Leaderboard /></ProtectedRoute>
             } />
             
-            <Route path="/services" element={
-              <ProtectedRoute><Services /></ProtectedRoute>
+            <Route path="/shop" element={
+              <ProtectedRoute><Shop /></ProtectedRoute>
             } />
             
             <Route path="/profile" element={
