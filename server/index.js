@@ -449,7 +449,10 @@ app.get('/api/leaderboard', authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.use((req, res) => res.sendFile(path.join(__dirname, '../client/dist/index.html')));
+app.use(express.static(path.join(__dirname, '../client/dist')));
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+});
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log('\n✅ Server connected! API ready on port', PORT));
