@@ -8,6 +8,7 @@ import Leaderboard from './pages/Leaderboard';
 import Services from './pages/Services';
 import Profile from './pages/Profile';
 import Admin from './pages/Admin';
+import Pricing from './pages/Pricing';
 import BottomNav from './components/BottomNav';
 import './index.css';
 
@@ -162,6 +163,10 @@ function App() {
             
             <Route path="/admin" element={
               <ProtectedRoute><Admin /></ProtectedRoute>
+            } />
+            
+            <Route path="/pricing" element={
+              <ProtectedRoute><Pricing /></ProtectedRoute>
             } />
             
             <Route path="*" element={<Navigate to="/" replace />} />

@@ -190,6 +190,22 @@ app.put('/api/user', authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.put('/api/user/subscribe', authenticateToken, async (req, res) => {
+  try {
+    const { plan } = req.body;
+    if (!['free', 'pro', 'elite'].includes(plan)) {
+      return res.status(400).json({ error: 'Invalid subscription plan' });
+    }
+    
+    await User.findByIdAndUpdate(req.user.id, { 
+      subscriptionPlan: plan,
+      subscriptionStatus: 'active'
+    });
+    
+    res.json({ message: `Successfully subscribed to ${plan} plan!` });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/user/plans', authenticateToken, async (req, res) => {
   try {
     const plans = await AssignedPlan.find({ user_id: req.user.id }).sort({ createdAt: -1 });

@@ -213,9 +213,34 @@ const Profile = () => {
         </div>
       )}
 
+      <div className="glass-card mb-4 section-settings">
+        <div className="flex-between mb-4">
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Award size={18} className="text-accent" /> Membership Tier
+          </h3>
+          <Link to="/pricing">
+            <button className="btn btn-primary btn-sm">Upgrade Plan</button>
+          </Link>
+        </div>
+        <div className="info-display">
+          <div className="info-row">
+            <span className="info-label">Active Plan</span>
+            <span className="info-value" style={{ textTransform: 'capitalize', color: user?.subscriptionPlan === 'elite' ? '#00ffaa' : (user?.subscriptionPlan === 'pro' ? '#00a3ff' : 'var(--text-secondary)'), fontWeight: 'bold' }}>
+              {user?.subscriptionPlan || 'Free'}
+            </span>
+          </div>
+          <div className="info-row">
+            <span className="info-label">Status</span>
+            <span className="info-value" style={{ color: '#00ffaa', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <CheckCircle size={14} /> Active
+            </span>
+          </div>
+        </div>
+      </div>
+
       {user?.purchasedServices?.length > 0 && (
         <div className="glass-card mb-4 section-settings">
-          <h3 className="mb-4">My Subscriptions</h3>
+          <h3 className="mb-4">Legacy Purchases</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {allServices.filter(s => user.purchasedServices.includes(s.id)).map(svc => (
               <div key={svc.id} className="flex-between" style={{ background: 'rgba(0,0,0,0.2)', padding: '12px 16px', borderRadius: '12px' }}>
