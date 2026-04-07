@@ -21,8 +21,9 @@ const Admin = () => {
     description: '',
     price: '',
     category: 'Supplements',
-    image: ''
+    images: []
   });
+  const [dragActive, setDragActive] = useState(false);
 
   // Modal state
   const [selectedUser, setSelectedUser] = useState(null);
@@ -46,6 +47,46 @@ const Admin = () => {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleImageUpload = (files) => {
+    const newImages = [...productForm.images];
+    
+    Array.from(files).forEach(file => {
+      if (file.size > 5 * 1024 * 1024) return alert('File too large (max 5MB)');
+      
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProductForm(prev => ({
+          ...prev,
+          images: [...prev.images, reader.result].slice(0, 5) // Max 5 images
+        }));
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeImage = (index) => {
+    setProductForm(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") setDragActive(true);
+    else if (e.type === "dragleave") setDragActive(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleImageUpload(e.dataTransfer.files);
     }
   };
 
@@ -102,7 +143,7 @@ const Admin = () => {
       if (res.ok) {
         const newProduct = await res.json();
         setProducts([newProduct, ...products]);
-        setProductForm({ name: '', description: '', price: '', category: 'Supplements', image: '' });
+        setProductForm({ name: '', description: '', price: '', category: 'Supplements', images: [] });
         alert('Product added to shop!');
       }
     } catch (err) { console.error(err); }
@@ -189,11 +230,16 @@ const Admin = () => {
     <div className="page" style={{ paddingBottom: '100px', maxWidth: '1000px', margin: '0 auto' }}>
       {/* Header */}
       <div className="flex-between mb-4">
-        <div>
-          <h1 className="page-title mb-2" style={{ margin: 0 }}><ShieldAlert className="inline-icon text-accent" /> Control Center</h1>
-          <p className="text-secondary" style={{ margin: 0 }}>V11 Coaching, Shop & Network Admin</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ background: 'var(--accent-color)', padding: '10px', borderRadius: '12px', color: '#000' }}>
+            <Dumbbell size={24} />
+          </div>
+          <div>
+            <h1 className="page-title mb-0" style={{ margin: 0, fontSize: '1.8rem' }}>GYMCORE <span style={{ color: 'var(--accent-color)' }}>ELITE</span></h1>
+            <p className="text-secondary" style={{ margin: 0, fontSize: '0.9rem', letterSpacing: '1px', textTransform: 'uppercase' }}>Command Center</p>
+          </div>
         </div>
-        <button onClick={logout} className="btn btn-secondary btn-sm" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <button onClick={logout} className="btn btn-secondary btn-sm" style={{ display: 'flex', gap: '8px', alignItems: 'center', border: '1px solid rgba(255, 77, 79, 0.2)' }}>
            <LogOut size={16} color="#ff4d4f" /> Logout
         </button>
       </div>
@@ -325,8 +371,8 @@ const Admin = () => {
       {activeTab === 'inventory' && (
         <div className="animate-fade-in">
            <div className="glass-card mb-6" style={{ padding: '24px' }}>
-              <h3 className="mb-4" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Plus size={20} className="text-accent"/> List New Product</h3>
-              <form onSubmit={handleAddProduct} style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+              <h3 className="mb-4" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Package size={20} className="text-accent"/> Professional Inventory Manager</h3>
+              <form onSubmit={handleAddProduct} style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
                  <div className="input-group">
                     <label className="input-label">Product Name</label>
                     <input className="input" placeholder="e.g. Whey Gold Standard" value={productForm.name} onChange={e => setProductForm({...productForm, name: e.target.value})} required />
@@ -345,31 +391,100 @@ const Admin = () => {
                     </select>
                  </div>
                  <div className="input-group">
-                    <label className="input-label">Image URL</label>
-                    <input className="input" placeholder="https://..." value={productForm.image} onChange={e => setProductForm({...productForm, image: e.target.value})} required />
+                    <label className="input-label">Multi-Image Upload (Max 5)</label>
+                    <div 
+                      onDragEnter={handleDrag} 
+                      onDragLeave={handleDrag} 
+                      onDragOver={handleDrag} 
+                      onDrop={handleDrop}
+                      style={{ 
+                        border: `2px dashed ${dragActive ? 'var(--accent-color)' : 'rgba(255,255,255,0.1)'}`,
+                        borderRadius: '12px',
+                        padding: '20px',
+                        textAlign: 'center',
+                        background: dragActive ? 'rgba(0,255,170,0.05)' : 'rgba(0,0,0,0.2)',
+                        transition: 'all 0.3s',
+                        cursor: 'pointer',
+                        position: 'relative'
+                      }}
+                      onClick={() => document.getElementById('file-upload').click()}
+                    >
+                      <Plus size={24} className="mb-2 mx-auto" />
+                      <p style={{ fontSize: '12px', margin: 0 }}>Drag or Click to upload images</p>
+                      <input id="file-upload" type="file" multiple accept="image/*" style={{ display: 'none' }} onChange={(e) => handleImageUpload(e.target.files)} />
+                    </div>
                  </div>
+
+                 {/* Image Previews */}
+                 {productForm.images.length > 0 && (
+                   <div style={{ gridColumn: 'span 2', display: 'flex', gap: '10px', flexWrap: 'wrap', background: 'rgba(0,0,0,0.1)', padding: '12px', borderRadius: '12px' }}>
+                      {productForm.images.map((img, idx) => (
+                        <div key={idx} style={{ position: 'relative', width: '80px', height: '80px' }}>
+                          <img src={img} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }} />
+                          <button 
+                            type="button" 
+                            onClick={(e) => { e.stopPropagation(); removeImage(idx); }}
+                            style={{ position: 'absolute', top: '-6px', right: '-6px', background: '#ff4d4f', border: 'none', borderRadius: '50%', color: '#fff', width: '20px', height: '20px', fontSize: '12px', cursor: 'pointer' }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                   </div>
+                 )}
+
                  <div className="input-group" style={{ gridColumn: 'span 2' }}>
-                    <label className="input-label">Description</label>
-                    <textarea className="input" rows="2" placeholder="Brief product summary..." value={productForm.description} onChange={e => setProductForm({...productForm, description: e.target.value})} required></textarea>
+                    <label className="input-label">Full Description</label>
+                    <textarea className="input" rows="3" placeholder="Explain the benefits, materials, or nutrition info..." value={productForm.description} onChange={e => setProductForm({...productForm, description: e.target.value})} required></textarea>
                  </div>
-                 <button type="submit" className="btn btn-primary" style={{ gridColumn: 'span 2' }}>Add to Shop Catalog</button>
+                 <button type="submit" className="btn btn-primary" style={{ gridColumn: 'span 2', padding: '15px' }}>Publish to Shop Catalog</button>
               </form>
            </div>
 
-           <div className="glass-card section-settings" style={{ padding: 0 }}>
-             <h3 style={{ padding: '20px 20px 10px' }}>Current Inventory ({products.length})</h3>
-             {products.map(p => (
-                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                   <img src={p.image} alt={p.name} style={{ width: '50px', height: '50px', borderRadius: '8px', objectFit: 'cover' }} />
-                   <div style={{ flexGrow: 1 }}>
-                      <div style={{ fontWeight: 'bold' }}>{p.name}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{p.category} | ${p.price.toFixed(2)}</div>
-                   </div>
-                   <button onClick={() => handleDeleteProduct(p.id)} style={{ background: 'rgba(255,77,79,0.1)', border: 'none', padding: '8px', borderRadius: '8px', cursor: 'pointer' }}>
-                      <Trash2 size={16} color="#ff4d4f" />
-                   </button>
-                </div>
-             ))}
+           <div className="glass-card" style={{ padding: 0 }}>
+             <h3 style={{ padding: '24px 24px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ShoppingBag size={20} className="text-accent" /> Active Inventory
+                <span style={{ fontSize: '12px', background: 'rgba(255,255,255,0.05)', padding: '2px 10px', borderRadius: '20px', marginLeft: 'auto', fontWeight: 'normal' }}>{products.length} Products</span>
+             </h3>
+             <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                  <thead style={{ background: 'rgba(0,0,0,0.2)', fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
+                    <tr>
+                      <th style={{ padding: '12px 24px' }}>Product</th>
+                      <th style={{ padding: '12px 24px' }}>Category</th>
+                      <th style={{ padding: '12px 24px' }}>Price</th>
+                      <th style={{ padding: '12px 24px' }}>Media</th>
+                      <th style={{ padding: '12px 24px' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {products.map(p => (
+                      <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.2s' }} className="admin-list-item">
+                        <td style={{ padding: '16px 24px' }}>
+                          <div style={{ fontWeight: '500' }}>{p.name}</div>
+                        </td>
+                        <td style={{ padding: '16px 24px' }}>
+                          <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{p.category}</span>
+                        </td>
+                        <td style={{ padding: '16px 24px' }}>
+                          <div style={{ fontWeight: '600', color: 'var(--accent-color)' }}>${p.price.toFixed(2)}</div>
+                        </td>
+                        <td style={{ padding: '16px 24px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <img src={p.images?.[0] || p.image} alt="main" style={{ width: '30px', height: '30px', borderRadius: '4px', objectFit: 'cover' }} />
+                            {p.images?.length > 1 && <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>+{p.images.length - 1}</span>}
+                          </div>
+                        </td>
+                        <td style={{ padding: '16px 24px' }}>
+                          <button onClick={() => handleDeleteProduct(p.id)} style={{ background: 'rgba(255,77,79,0.1)', border: 'none', padding: '6px', borderRadius: '6px', cursor: 'pointer' }}>
+                             <Trash2 size={16} color="#ff4d4f" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+             </div>
            </div>
         </div>
       )}
