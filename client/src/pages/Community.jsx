@@ -148,17 +148,17 @@ const Community = () => {
       {loading ? <p>Loading posts...</p> : (
         <div className="feed">
           {posts.map(post => (
-            <div key={post.id} className="glass-card post-card mb-4">
+            <div key={post._id} className="glass-card post-card mb-4">
               <div className="post-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div style={{ display: 'flex', gap: '12px' }}>
-                  <img src={post.avatar} alt={post.name} className="post-avatar" />
+                  <img src={post.user_avatar} alt={post.user_name} className="post-avatar" />
                   <div>
-                    <h4 className="post-author">{post.name}</h4>
-                    <p className="post-time">{formatTime(post.timestamp)}</p>
+                    <h4 className="post-author">{post.user_name}</h4>
+                    <p className="post-time">{formatTime(post.createdAt)}</p>
                   </div>
                 </div>
                 {(user?.role === 'admin' || post.user_id === user?.id) && (
-                  <button onClick={() => handleDeletePost(post.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
+                  <button onClick={() => handleDeletePost(post._id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
                     <Trash2 size={16} color="#ff4d4f" />
                   </button>
                 )}
@@ -172,7 +172,7 @@ const Community = () => {
               <div className="post-footer" style={{ display: 'flex', gap: '16px' }}>
                 <button 
                   className={`action-btn ${post.likedBy?.includes(user?.id) ? 'liked' : ''}`} 
-                  onClick={() => handleLike(post.id)}
+                  onClick={() => handleLike(post._id)}
                   style={{ color: post.likedBy?.includes(user?.id) ? '#ff4d4f' : 'inherit' }}
                 >
                   <Heart size={18} fill={post.likedBy?.includes(user?.id) ? '#ff4d4f' : 'none'} /> {post.likes} Likes
@@ -180,7 +180,7 @@ const Community = () => {
                 <button 
                   className="action-btn" 
                   onClick={() => {
-                    setActiveCommentPost(activeCommentPost === post.id ? null : post.id);
+                    setActiveCommentPost(activeCommentPost === post._id ? null : post._id);
                     setCommentText('');
                   }}
                 >
@@ -191,10 +191,10 @@ const Community = () => {
               {post.comments && post.comments.length > 0 && (
                 <div className="comments-list" style={{ marginTop: '16px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '16px' }}>
                   {post.comments.map(c => (
-                    <div key={c.id} className="comment-item" style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                      <img src={c.avatar} alt={c.name} style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />
+                    <div key={c._id} className="comment-item" style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                      <img src={c.user_avatar} alt={c.user_name} style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />
                       <div className="comment-content" style={{ background: 'rgba(0,0,0,0.2)', padding: '8px 12px', borderRadius: '12px', flex: 1 }}>
-                        <h5 style={{ fontSize: '13px', marginBottom: '4px', color: '#fff' }}>{c.name}</h5>
+                        <h5 style={{ fontSize: '13px', marginBottom: '4px', color: '#fff' }}>{c.user_name}</h5>
                         <p style={{ fontSize: '14px', color: '#ccc' }}>{c.content}</p>
                       </div>
                     </div>
@@ -202,8 +202,8 @@ const Community = () => {
                 </div>
               )}
 
-              {activeCommentPost === post.id && (
-                <form className="comment-form flex-between" style={{ marginTop: '12px', gap: '8px' }} onSubmit={(e) => handleCommentSubmit(e, post.id)}>
+              {activeCommentPost === post._id && (
+                <form className="comment-form flex-between" style={{ marginTop: '12px', gap: '8px' }} onSubmit={(e) => handleCommentSubmit(e, post._id)}>
                   <input 
                     type="text" 
                     className="input" 

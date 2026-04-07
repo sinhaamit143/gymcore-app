@@ -404,6 +404,7 @@ app.delete('/api/community/posts/:id', authenticateToken, async (req, res) => {
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ error: 'Post not found' });
     
+    // Check if user is owner or admin
     const user = await User.findById(req.user.id);
     if (post.user_id.toString() !== req.user.id && user.role !== 'admin') {
       return res.status(403).json({ error: 'Unauthorized to delete this post' });
