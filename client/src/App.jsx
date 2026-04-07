@@ -9,6 +9,7 @@ import Shop from './pages/Shop';
 import Profile from './pages/Profile';
 import Admin from './pages/Admin';
 import Pricing from './pages/Pricing';
+import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 import './index.css';
 
@@ -125,6 +126,7 @@ const AppLayout = ({ children }) => {
            </button>
         </div>
       )}
+      <Header />
       {children}
       {user && !hideNav && <BottomNav />}
     </div>
