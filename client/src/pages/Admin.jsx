@@ -9,6 +9,14 @@ import {
 const Admin = () => {
   const { token, user: currentUser, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'members' | 'inventory'
+
+  const SafeAvatar = ({ src, name, size = '36px' }) => {
+    // If avatar string is excessively large, use a placeholder to prevent browser crash
+    const isValid = src && src.length < 50000; // 50KB limit for rendering safety
+    const displaySrc = isValid ? src : `https://i.pravatar.cc/150?u=${name}`;
+    
+    return <img src={displaySrc} alt={name} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover' }} />;
+  };
   
   const [usersList, setUsersList] = useState([]);
   const [products, setProducts] = useState([]);
@@ -321,7 +329,7 @@ const Admin = () => {
             {filteredUsers.map(u => (
               <div key={u.id} className="admin-list-item" onClick={() => openUserDetails(u)} style={{ cursor: 'pointer', padding: u.id === currentUser.id ? '16px' : '12px 16px', display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr auto', gap: '10px', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.2s' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', overflow: 'hidden' }}>
-                  <img src={u.avatar} alt="avatar" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} />
+                  <SafeAvatar src={u.avatar} name={u.name} />
                   <div style={{ overflow: 'hidden' }}>
                     <div style={{ fontWeight: '500', color: '#fff', fontSize: '14px' }}>{u.name} {u.id === currentUser.id ? '(You)' : ''}</div>
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{u.email}</div>
@@ -502,7 +510,7 @@ const Admin = () => {
               </button>
               
               <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '32px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '20px' }}>
-                 <img src={selectedUser.avatar} alt="User" style={{ width: '80px', height: '80px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.1)' }} />
+                 <SafeAvatar src={selectedUser.avatar} name={selectedUser.name} size="80px" />
                  <div>
                     <h2 style={{ margin: 0, fontSize: '24px' }}>{selectedUser.name}</h2>
                     <p className="text-secondary" style={{ margin: '4px 0 0 0' }}>{selectedUser.email}</p>

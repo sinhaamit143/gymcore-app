@@ -35,8 +35,24 @@ mongoose.connect(MONGO_URI)
   .then(() => {
     console.log('Connected to MongoDB safely!');
     seedDatabase();
+    cleanupStaleData();
   })
   .catch(err => console.log('MongoDB Hook Error:', err));
+
+const cleanupStaleData = async () => {
+  try {
+    const users = await User.find({ avatar: { $exists: true } });
+    let count = 0;
+    for (let u of users) {
+      if (u.avatar && u.avatar.length > 500000) { // > 500KB
+         u.avatar = 'https://i.pravatar.cc/150?u=' + u.email;
+         await u.save();
+         count++;
+      }
+    }
+    if (count > 0) console.log(`🧹 Data Cleanup: Truncated ${count} massive avatar strings.`);
+  } catch (err) { console.error('Cleanup Error:', err); }
+};
 
 const seedDatabase = async () => {
   try {
