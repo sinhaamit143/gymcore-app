@@ -50,7 +50,15 @@ const Admin = () => {
         fetch('/api/admin/users', { headers: { 'Authorization': `Bearer ${token}` } }),
         fetch('/api/products', { headers: { 'Authorization': `Bearer ${token}` } })
       ]);
-      if (uRes.ok) setUsersList(await uRes.json());
+      if (uRes.ok) {
+        const data = await uRes.json();
+        // Aggressive safety: strip huge avatar strings from local state to prevent blowup
+        const safeData = data.map(u => ({
+          ...u,
+          avatar: (u.avatar && u.avatar.length > 100000) ? `https://i.pravatar.cc/150?u=${u.email}` : u.avatar
+        }));
+        setUsersList(safeData);
+      }
       if (pRes.ok) setProducts(await pRes.json());
     } catch (err) {
       console.error(err);

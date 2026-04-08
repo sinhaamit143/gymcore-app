@@ -234,7 +234,15 @@ app.get('/api/user/plans', authenticateToken, async (req, res) => {
 app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const users = await User.find().select('-password').sort({ createdAt: -1 });
-    res.json(users);
+    // Aggressive safety mapping: truncating huge avatars on the fly
+    const safeUsers = users.map(u => {
+      const obj = u.toObject();
+      if (obj.avatar && obj.avatar.length > 100000) {
+        obj.avatar = `https://i.pravatar.cc/150?u=${obj.email}`;
+      }
+      return obj;
+    });
+    res.json(safeUsers);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
