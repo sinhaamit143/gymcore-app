@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../App';
 import { 
   Users, Trash2, Search, ShieldAlert, LogOut, Bell, X, Activity, 
-  Plus, Shield, ArrowRight, ShoppingBag, Tag, DollarSign, Package 
+  Plus, Shield, ArrowRight, ShoppingBag, Tag, DollarSign, Package,
+  Dumbbell
 } from 'lucide-react';
 
 const Admin = () => {

@@ -110,7 +110,7 @@ mongoose.set('toJSON', {
   }
 });
 
-app.use(express.static(path.join(__dirname, '../client/dist')));
+
 
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -451,6 +451,10 @@ app.get('/api/leaderboard', authenticateToken, async (req, res) => {
 
 app.use(express.static(path.join(__dirname, '../client/dist')));
 app.get('*', (req, res) => {
+  // If request is for an API or an asset that was not found by express.static, don't return index.html
+  if (req.path.startsWith('/api') || req.path.includes('.')) {
+    return res.status(404).json({ error: 'Not Found' });
+  }
   res.sendFile(path.join(__dirname, '../client/dist/index.html'));
 });
 
