@@ -239,17 +239,19 @@ app.get('/api/user/plans', authenticateToken, async (req, res) => {
 // --- Admin Routes ---
 app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const users = await User.find().select('-password').sort({ createdAt: -1 });
+    const users = await User.find().lean().select('-password').sort({ createdAt: -1 });
+    console.log(`🔍 Admin fetch: Processing ${users.length} users. V:14.2`);
+    
     // EXTREMELY Aggressive safety mapping
     const safeUsers = users.map(u => {
-      const obj = u.toObject();
-      if (obj.avatar && obj.avatar.length > 50000) { // Even tighter limit: 50KB
-        console.log(`⚠️ Truncating massive avatar for ${obj.email} (Length: ${obj.avatar.length})`);
-        obj.avatar = `https://i.pravatar.cc/150?u=${obj.email}`;
+      if (u.avatar && u.avatar.length > 30000) { // 30KB limit
+        console.log(`⚠️  TRUNCATED: ${u.email} avatar was ${u.avatar.length} chars.`);
+        u.avatar = `https://i.pravatar.cc/150?u=${u.email}`;
       }
-      return obj;
+      return u;
     });
-    res.json(safeUsers);
+    
+    res.json({ version: '14.2', users: safeUsers });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

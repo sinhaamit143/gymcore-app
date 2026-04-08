@@ -48,8 +48,9 @@ const Admin = () => {
       ]);
       if (uRes.ok) {
         const data = await uRes.json();
+        const rawUsers = data.users || data;
         // Critical safety truncation
-        const safeData = data.map(u => ({
+        const safeData = rawUsers.map(u => ({
           ...u,
           avatar: (u.avatar && u.avatar.length > 100000) ? `https://i.pravatar.cc/150?u=${u.email}` : u.avatar
         }));
