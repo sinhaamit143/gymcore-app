@@ -196,7 +196,13 @@ app.get('/api/user', authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
     if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json(user);
+    
+    // Safety check for current user as well
+    const obj = user.toObject();
+    if (obj.avatar && obj.avatar.length > 50000) {
+      obj.avatar = `https://i.pravatar.cc/150?u=${obj.email}`;
+    }
+    res.json(obj);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -234,10 +240,11 @@ app.get('/api/user/plans', authenticateToken, async (req, res) => {
 app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const users = await User.find().select('-password').sort({ createdAt: -1 });
-    // Aggressive safety mapping: truncating huge avatars on the fly
+    // EXTREMELY Aggressive safety mapping
     const safeUsers = users.map(u => {
       const obj = u.toObject();
-      if (obj.avatar && obj.avatar.length > 100000) {
+      if (obj.avatar && obj.avatar.length > 50000) { // Even tighter limit: 50KB
+        console.log(`⚠️ Truncating massive avatar for ${obj.email} (Length: ${obj.avatar.length})`);
         obj.avatar = `https://i.pravatar.cc/150?u=${obj.email}`;
       }
       return obj;
