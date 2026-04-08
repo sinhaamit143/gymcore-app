@@ -105,28 +105,30 @@ const AppLayout = ({ children }) => {
   return (
     <div className="app-container">
       {user && !hideNav && (
-        <div style={{ position: 'fixed', top: '16px', right: '16px', zIndex: 9999 }}>
-          <button 
-             onClick={toggleTheme} 
-             style={{ 
-               background: 'var(--glass-bg)', 
-               backdropFilter: 'blur(10px)',
-               border: '1px solid var(--glass-border)', 
-               color: 'var(--text-primary)', 
-               cursor: 'pointer', 
-               padding: '10px',
-               borderRadius: '50%',
-               display: 'flex',
-               justifyContent: 'center',
-               alignItems: 'center',
-               boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-             }}
-           >
-             {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
-           </button>
-        </div>
+        <>
+          <div style={{ position: 'fixed', top: '16px', right: '16px', zIndex: 9999 }}>
+            <button 
+              onClick={toggleTheme} 
+              style={{ 
+                background: 'var(--glass-bg)', 
+                backdropFilter: 'blur(10px)',
+                border: '1px solid var(--glass-border)', 
+                color: 'var(--text-primary)', 
+                cursor: 'pointer', 
+                padding: '10px',
+                borderRadius: '50%',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+              }}
+            >
+              {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+            </button>
+          </div>
+          <Header />
+        </>
       )}
-      <Header />
       {children}
       {user && !hideNav && <BottomNav />}
     </div>

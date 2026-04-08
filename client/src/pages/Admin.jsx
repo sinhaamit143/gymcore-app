@@ -48,10 +48,14 @@ const Admin = () => {
       ]);
       if (uRes.ok) {
         const data = await uRes.json();
-        const rawUsers = data.users || data;
-        // Critical safety truncation
+        // Robust array validation
+        const rawUsers = (data && Array.isArray(data.users)) ? data.users : (Array.isArray(data) ? data : []);
+        
+        // Critical safety truncation with property fallbacks
         const safeData = rawUsers.map(u => ({
           ...u,
+          name: u.name || 'Anonymous',
+          email: u.email || `user_${u.id || Math.random()}`,
           avatar: (u.avatar && u.avatar.length > 100000) ? `https://i.pravatar.cc/150?u=${u.email}` : u.avatar
         }));
         setUsersList(safeData);
@@ -178,7 +182,12 @@ const Admin = () => {
   if (loading) return <div className="page"><p>Loading...</p></div>;
   if (currentUser?.role !== 'admin') return <div className="page">Unauthorized</div>;
 
-  const filteredUsers = usersList.filter(u => u.name.toLowerCase().includes(searchTerm.toLowerCase()) || u.email.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredUsers = usersList.filter(u => {
+    const name = (u.name || '').toLowerCase();
+    const email = (u.email || '').toLowerCase();
+    const search = (searchTerm || '').toLowerCase();
+    return name.includes(search) || email.includes(search);
+  });
 
   return (
     <div className="page" style={{ paddingBottom: '100px' }}>
