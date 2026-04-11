@@ -183,10 +183,10 @@ const Admin = () => {
   if (currentUser?.role !== 'admin') return <div className="page">Unauthorized</div>;
 
   const filteredUsers = usersList.filter(u => {
-    const name = (u.name || '').toLowerCase();
-    const email = (u.email || '').toLowerCase();
-    const search = (searchTerm || '').toLowerCase();
-    return name.includes(search) || email.includes(search);
+    const safeName = u.name ? String(u.name).toLowerCase() : '';
+    const safeEmail = u.email ? String(u.email).toLowerCase() : '';
+    const search = searchTerm ? String(searchTerm).toLowerCase() : '';
+    return safeName.includes(search) || safeEmail.includes(search);
   });
 
   return (
@@ -242,25 +242,27 @@ const Admin = () => {
             value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
           />
           <div className="glass-card" style={{ padding: 0 }}>
-            {filteredUsers.map(u => (
-              <div key={u.id} className="admin-list-item" onClick={() => openUserDetails(u)} style={{ padding: '12px 15px', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+            {filteredUsers.map(u => {
+              const userId = u._id || u.id;
+              return (
+              <div key={userId} className="admin-list-item" onClick={() => openUserDetails(u)} style={{ padding: '12px 15px', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                 <SafeAvatar src={u.avatar} name={u.name} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '14px', fontWeight: '500' }}>{u.name}</div>
                   <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{u.email}</div>
                 </div>
                 <div style={{ display: 'flex', gap: '5px' }}>
-                  {u.id !== currentUser.id && (
-                    <button onClick={(e) => handleRoleToggle(u.id, u.role, e)} className="btn btn-secondary btn-sm" style={{ padding: '5px' }}>
+                  {userId !== currentUser?.id && userId !== currentUser?._id && (
+                    <button onClick={(e) => handleRoleToggle(userId, u.role, e)} className="btn btn-secondary btn-sm" style={{ padding: '5px' }}>
                       {u.role === 'admin' ? <ShieldAlert size={14} /> : <Shield size={14} />}
                     </button>
                   )}
-                  <button onClick={(e) => handleDeleteUser(u.id, e)} className="btn btn-secondary btn-sm" style={{ padding: '5px' }}>
+                  <button onClick={(e) => handleDeleteUser(userId, e)} className="btn btn-secondary btn-sm" style={{ padding: '5px' }}>
                     <Trash2 size={14} color="#ff4d4f" />
                   </button>
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         </div>
       )}
