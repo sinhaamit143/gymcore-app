@@ -6,11 +6,42 @@ import './Auth.css';
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
-  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+  const [formData, setFormData] = useState({ name: '', email: '', password: '', gymId: '' });
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  const [gymBranding, setGymBranding] = useState(null);
+  const [gymError, setGymError] = useState(null);
+
+  // Debounced fetch for Gym ID
+  React.useEffect(() => {
+    if (!formData.gymId || formData.gymId.length < 10) {
+      setGymBranding(null);
+      setGymError(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/gyms/public/${formData.gymId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setGymBranding(data);
+          setGymError(null);
+        } else {
+          setGymBranding(null);
+          setGymError('Gym not found');
+        }
+      } catch (err) {
+        setGymBranding(null);
+        setGymError('Error fetching gym');
+      }
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [formData.gymId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -30,7 +61,9 @@ const Auth = () => {
       if (!res.ok) throw new Error(data.error || 'Authentication failed');
 
       login(data.user, data.token);
-      if (data.user.role === 'admin') {
+      if (data.user.role === 'SUPER_ADMIN') {
+        navigate('/supaadmin');
+      } else if (data.user.role === 'GYM_OWNER') {
         navigate('/admin');
       } else if (!isLogin) {
         navigate('/pricing');
@@ -47,9 +80,13 @@ const Auth = () => {
   return (
     <div className="auth-container">
       <div className="auth-branding glass">
-        <Activity size={48} className="text-accent" />
-        <h2>GymCore</h2>
-        <p className="text-secondary">Your Ultimate Mobile Fitness Companion</p>
+        {gymBranding?.logoUrl ? (
+          <img src={gymBranding.logoUrl} alt="Gym Logo" style={{ width: '120px', height: 'auto', marginBottom: '15px', objectFit: 'contain' }} className="animate-fade-in" />
+        ) : (
+          <Activity size={48} className="text-accent" />
+        )}
+        <h2>{gymBranding?.name || 'GymCore'}</h2>
+        <p className="text-secondary">{gymBranding ? 'Welcome to our exclusive studio' : 'Your Ultimate Mobile Fitness Companion'}</p>
       </div>
 
       <div className="auth-card glass-card">
@@ -72,6 +109,20 @@ const Auth = () => {
               />
             </div>
           )}
+
+          <div className="input-group">
+            <label className="input-label">Gym ID <span style={{fontSize: '10px', opacity: 0.6}}>(Optional for SuperAdmin only)</span></label>
+            <input 
+              type="text" 
+              className="input" 
+              placeholder="e.g. 550e8400-e29b..."
+              style={{ borderColor: gymError ? '#ff4d4f' : 'rgba(255,255,255,0.1)' }}
+              value={formData.gymId} 
+              onChange={(e) => setFormData({...formData, gymId: e.target.value})}
+              required={!isLogin} 
+            />
+            {gymError && <span style={{ color: '#ff4d4f', fontSize: '11px', marginTop: '4px', display: 'block' }}>{gymError}</span>}
+          </div>
           
           <div className="input-group">
             <label className="input-label">Email</label>

@@ -1,17 +1,20 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Sun, Moon } from 'lucide-react';
-import Auth from './pages/Auth';
-import Dashboard from './pages/Dashboard';
-import Community from './pages/Community';
-import Leaderboard from './pages/Leaderboard';
-import Shop from './pages/Shop';
-import Profile from './pages/Profile';
-import Admin from './pages/Admin';
-import Pricing from './pages/Pricing';
-import Header from './components/Header';
-import BottomNav from './components/BottomNav';
 import './index.css';
+
+// Lazy load pages to break circular dependencies and improve performance
+const Auth = lazy(() => import('./pages/Auth'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Community = lazy(() => import('./pages/Community'));
+const Leaderboard = lazy(() => import('./pages/Leaderboard'));
+const Shop = lazy(() => import('./pages/Shop'));
+const Profile = lazy(() => import('./pages/Profile'));
+const Admin = lazy(() => import('./pages/Admin'));
+const SupaAdmin = lazy(() => import('./pages/SupaAdmin'));
+const Pricing = lazy(() => import('./pages/Pricing'));
+const Header = lazy(() => import('./components/Header'));
+const BottomNav = lazy(() => import('./components/BottomNav'));
 
 // --- Context & Auth State ---
 const AuthContext = createContext(null);
@@ -20,7 +23,7 @@ const ThemeContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
 export const useTheme = () => useContext(ThemeContext);
 
-const ThemeProvider = ({ children }) => {
+export const ThemeProvider = ({ children }) => {
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
 
   useEffect(() => {
@@ -41,7 +44,7 @@ const ThemeProvider = ({ children }) => {
   );
 };
 
-const AuthProvider = ({ children }) => {
+export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [loading, setLoading] = useState(true);
@@ -88,10 +91,11 @@ const AuthProvider = ({ children }) => {
 };
 
 // --- Protected Route Helper ---
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
   if (loading) return <div className="page"><p>Loading...</p></div>;
   if (!user) return <Navigate to="/login" replace />;
+  if (allowedRoles && !allowedRoles.includes(user.role)) return <Navigate to="/" replace />;
   return children;
 };
 
@@ -100,7 +104,7 @@ const AppLayout = ({ children }) => {
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
-  const hideNav = location.pathname === '/login' || user?.role === 'admin';
+  const hideNav = location.pathname === '/login' || user?.role === 'SUPER_ADMIN' || user?.role === 'GYM_OWNER';
 
   return (
     <div className="app-container">
@@ -129,7 +133,9 @@ const AppLayout = ({ children }) => {
           <Header />
         </>
       )}
-      {children}
+      <Suspense fallback={<div className="page"><p>Loading...</p></div>}>
+        {children}
+      </Suspense>
       {user && !hideNav && <BottomNav />}
     </div>
   );
@@ -166,7 +172,15 @@ function App() {
             } />
             
             <Route path="/admin" element={
-              <ProtectedRoute><Admin /></ProtectedRoute>
+              <ProtectedRoute allowedRoles={['GYM_OWNER', 'SUPER_ADMIN']}>
+                <Admin />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/supaadmin" element={
+              <ProtectedRoute allowedRoles={['SUPER_ADMIN']}>
+                <SupaAdmin />
+              </ProtectedRoute>
             } />
             
             <Route path="/pricing" element={

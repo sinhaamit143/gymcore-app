@@ -180,7 +180,7 @@ const Admin = () => {
   };
 
   if (loading) return <div className="page"><p>Loading...</p></div>;
-  if (currentUser?.role !== 'admin') return <div className="page">Unauthorized</div>;
+  if (!['GYM_OWNER', 'SUPER_ADMIN'].includes(currentUser?.role)) return <div className="page">Unauthorized</div>;
 
   const filteredUsers = usersList.filter(u => {
     const safeName = u.name ? String(u.name).toLowerCase() : '';
@@ -254,7 +254,7 @@ const Admin = () => {
                 <div style={{ display: 'flex', gap: '5px' }}>
                   {userId !== currentUser?.id && userId !== currentUser?._id && (
                     <button onClick={(e) => handleRoleToggle(userId, u.role, e)} className="btn btn-secondary btn-sm" style={{ padding: '5px' }}>
-                      {u.role === 'admin' ? <ShieldAlert size={14} /> : <Shield size={14} />}
+                      {u.role === 'GYM_OWNER' ? <ShieldAlert size={14} /> : <Shield size={14} />}
                     </button>
                   )}
                   <button onClick={(e) => handleDeleteUser(userId, e)} className="btn btn-secondary btn-sm" style={{ padding: '5px' }}>

@@ -1,0 +1,140 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Gym {
+  id        String    @id @default(uuid())
+  name      String
+  location  String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  logoUrl       String?
+  products      Product[]
+  users         User[]
+  scheduledPosts ScheduledPost[]
+}
+
+model User {
+  id                 String         @id @default(uuid())
+  email              String         @unique
+  password           String
+  name               String
+  avatar             String?        @db.VarChar(500)
+  phone              String?
+  role               Role           @default(GYM_MEMBER)
+  points             Int            @default(0)
+  subscriptionPlan   String?
+  subscriptionStatus String?        @default("Active")
+  socialTokens       Json?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  gymId              String?
+  assignedPlans      AssignedPlan[]
+  nutrition          Nutrition[]
+  posts              Post[]
+  gym                Gym?           @relation(fields: [gymId], references: [id])
+  workouts           Workout[]
+}
+
+model Product {
+  id          String  @id @default(uuid())
+  name        String
+  description String
+  price       Float
+  category    String
+  image       String?
+  gymId       String?
+  gym         Gym?    @relation(fields: [gymId], references: [id])
+}
+
+model Workout {
+  id       String   @id @default(uuid())
+  type     String
+  duration Int
+  calories Int
+  date     DateTime @default(now())
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Nutrition {
+  id       String   @id @default(uuid())
+  meal     String
+  calories Int
+  protein  Int
+  carbs    Int
+  fat      Int
+  date     DateTime @default(now())
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Post {
+  id        String   @id @default(uuid())
+  content   String
+  likes     Int      @default(0)
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AssignedPlan {
+  id        String   @id @default(uuid())
+  type      String
+  title     String
+  details   String
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PricingConfig {
+  id        String   @id @default(uuid())
+  plan      String   @unique  // "Basic", "Premium", "Enterprise"
+  priceINR  Float
+  updatedAt DateTime @updatedAt
+}
+
+model SystemLog {
+  id        String   @id @default(uuid())
+  level     String   // "INFO" | "WARN" | "ERROR"
+  action    String   // e.g. "CLIENT_LOGIN", "LOGO_UPLOADED"
+  gymId     String?  // nullable — some events have no gym
+  userId    String?  // who triggered it
+  message   String   // Human-readable description
+  metadata  Json?    // Extra details: IP, endpoint, error stack trace
+  createdAt DateTime @default(now())
+}
+
+model ScheduledPost {
+  id          String    @id @default(uuid())
+  gymId       String
+  gym         Gym       @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  title       String
+  caption     String
+  hashtags    String?
+  platforms   Json
+  mediaUrl    String
+  mediaType   String
+  fileName    String
+  scheduledAt DateTime
+  status      String    @default("DRAFT")
+  publishedAt DateTime?
+  errorLog    String?
+  recurring   String    @default("none")
+  parentId    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+enum Role {
+  SUPER_ADMIN
+  GYM_OWNER
+  GYM_MEMBER
+}

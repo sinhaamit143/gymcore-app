@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Shield, Activity, Dumbbell } from 'lucide-react';
-import { useAuth } from '../App';
+import { useAuth, useTheme } from '../App';
 import './Header.css';
 
 const Header = () => {
@@ -15,12 +15,18 @@ const Header = () => {
   return (
     <header className="app-header glass">
       <Link to="/" className="header-logo">
-        <div className="logo-icon">
-          <Dumbbell size={20} />
-        </div>
-        <div className="logo-text">
-          GYMCORE <span>ELITE</span>
-        </div>
+        {user?.gym?.logoUrl ? (
+          <img src={user.gym.logoUrl} alt="Gym Logo" style={{ height: '36px', width: 'auto', objectFit: 'contain' }} />
+        ) : (
+          <>
+            <div className="logo-icon">
+              <Dumbbell size={20} />
+            </div>
+            <div className="logo-text">
+              GYMCORE <span>ELITE</span>
+            </div>
+          </>
+        )}
       </Link>
 
       <div className="header-actions">

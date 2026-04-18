@@ -303,7 +303,7 @@ const Profile = () => {
          </button>
       </div>
 
-      {user?.role === 'admin' && (
+      {['SUPER_ADMIN', 'GYM_OWNER'].includes(user?.role) && (
         <Link to="/admin" style={{ textDecoration: 'none' }}>
           <button className="btn mb-4 btn-full" style={{ background: 'rgba(0, 255, 170, 0.1)', color: '#00ffaa', border: '1px solid rgba(0,255,170,0.3)', display: 'flex', justifyContent: 'center' }}>
             <ShieldAlert size={18} style={{ marginRight: '8px' }} /> Admin Panel

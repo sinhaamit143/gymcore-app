@@ -157,7 +157,7 @@ const Community = () => {
                     <p className="post-time">{formatTime(post.createdAt)}</p>
                   </div>
                 </div>
-                {(user?.role === 'admin' || post.user_id === user?.id) && (
+                {(['SUPER_ADMIN', 'GYM_OWNER'].includes(user?.role) || post.user_id === user?.id) && (
                   <button onClick={() => handleDeletePost(post._id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
                     <Trash2 size={16} color="#ff4d4f" />
                   </button>
