@@ -424,7 +424,7 @@ app.post('/api/admin/assign-plan', authenticateToken, requireAdmin, async (req, 
       }
     });
 
-    await writeLog('INFO', 'CLIENT_CREATED', `Added new client: ${clientName}`, user.gymId, req.user.id, { email });
+    await writeLog('INFO', 'PLAN_ASSIGNED', `Assigned plan "${title}" to user ${targetUser.name}`, targetUser.gymId, req.user.id);
     res.status(201).json(plan);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -432,18 +432,31 @@ app.post('/api/admin/assign-plan', authenticateToken, requireAdmin, async (req, 
 // --- SupaAdmin Routes ---
 app.get('/api/supaadmin/clients', authenticateToken, requireSuperAdmin, async (req, res) => {
   try {
-    const clients = await prisma.user.findMany({
-      where: { role: 'GYM_OWNER' },
-      include: { gym: true },
-      orderBy: { createdAt: 'desc' }
-    });
+    const { page = 1, limit = 10 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [clients, total] = await Promise.all([
+      prisma.user.findMany({
+        where: { role: 'GYM_OWNER' },
+        include: { gym: true },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: parseInt(limit)
+      }),
+      prisma.user.count({ where: { role: 'GYM_OWNER' } })
+    ]);
     
     const formatted = clients.map(client => ({
       ...client,
       password: undefined
     }));
     
-    res.json(formatted);
+    res.json({
+      clients: formatted,
+      total,
+      page: parseInt(page),
+      totalPages: Math.ceil(total / parseInt(limit))
+    });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -552,12 +565,11 @@ app.patch('/api/supaadmin/clients/:id/password', authenticateToken, requireSuper
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    await prisma.user.update({
+    const target = await prisma.user.update({
       where: { id: req.params.id },
       data: { password: hashedPassword }
     });
 
-    const target = await prisma.user.findUnique({ where: { id: userId } });
     await writeLog('INFO', 'PASSWORD_RESET', `SuperAdmin reset password for user: ${target.name}`, target.gymId, req.user.id);
     res.json({ message: 'Password updated successfully' });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -587,8 +599,8 @@ app.patch('/api/supaadmin/clients/:id', authenticateToken, requireSuperAdmin, up
     });
 
     // Update gym fields if provided
-    if (existingUser.gymId) {
-      const gym = await prisma.gym.findUnique({ where: { id: existingUser.gymId } });
+    if (updatedUser.gymId) {
+      const gym = await prisma.gym.findUnique({ where: { id: updatedUser.gymId } });
       let updatedSocial = gym?.socialTokens || {};
       
       if (parsedSocial) {
@@ -603,7 +615,7 @@ app.patch('/api/supaadmin/clients/:id', authenticateToken, requireSuperAdmin, up
       }
 
       await prisma.gym.update({
-        where: { id: existingUser.gymId },
+        where: { id: updatedUser.gymId },
         data: { 
           ...(businessName && { name: businessName }),
           ...(gymLocation !== undefined && { location: gymLocation }),
@@ -833,7 +845,7 @@ app.post('/api/supaadmin/posts/:gymId/media', authenticateToken, requireSuperAdm
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/supaadmin/posts', authenticateToken, requireSuperAdmin, uploadPost.single('media'), async (req, res) => {
+app.post('/api/supaadmin/posts/:gymId', authenticateToken, requireSuperAdmin, uploadPost.single('media'), async (req, res) => {
   try {
     const data = { ...req.body };
     if (typeof data.platforms === 'string') {
@@ -848,7 +860,7 @@ app.post('/api/supaadmin/posts', authenticateToken, requireSuperAdmin, uploadPos
     if (data.scheduledAt) data.scheduledAt = new Date(data.scheduledAt);
 
     if (req.file) {
-      data.mediaUrl = `/api/uploads/posts/${data.gymId}/${req.file.filename}`;
+      data.mediaUrl = `/api/uploads/posts/${req.params.gymId}/${req.file.filename}`;
       data.fileName = req.file.filename;
       data.mediaType = req.file.mimetype.split('/')[0]; // 'image' or 'video'
     }
@@ -860,7 +872,7 @@ app.post('/api/supaadmin/posts', authenticateToken, requireSuperAdmin, uploadPos
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.patch('/api/supaadmin/posts/:id', authenticateToken, requireSuperAdmin, uploadPost.single('media'), async (req, res) => {
+app.patch('/api/supaadmin/posts/:gymId/:id', authenticateToken, requireSuperAdmin, uploadPost.single('media'), async (req, res) => {
   try {
     const data = { ...req.body };
     if (typeof data.platforms === 'string') {
@@ -870,7 +882,7 @@ app.patch('/api/supaadmin/posts/:id', authenticateToken, requireSuperAdmin, uplo
     if (data.scheduledAt && data.status === 'DRAFT') data.status = 'SCHEDULED';
 
     if (req.file) {
-      data.mediaUrl = `/api/uploads/posts/${data.gymId}/${req.file.filename}`;
+      data.mediaUrl = `/api/uploads/posts/${req.params.gymId}/${req.file.filename}`;
       data.fileName = req.file.filename;
       data.mediaType = req.file.mimetype.split('/')[0];
     }

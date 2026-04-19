@@ -3,8 +3,8 @@ import { useAuth } from '../App';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ScrollText,
-  Plus, Edit, Trash2, Power, Activity, Menu,
-  Instagram, Facebook, Twitter, Globe, Key, Eye, Image as ImageIcon, Search, ShieldCheck, Mail, Phone,
+  Plus, Edit, Edit3, Trash2, Power, Activity, Menu, X, Calendar, Hash, Type, MessageCircle, Check, Repeat, AlertTriangle, AlertCircle,
+  Instagram, Facebook, Twitter, Globe, Key, Eye, Image as ImageIcon, Search, ShieldCheck, Mail, Phone, Copy,
   IndianRupee, PieChart, TrendingUp, Info, Zap, Crown
 } from 'lucide-react';
 import {
@@ -68,6 +68,10 @@ const SupaAdmin = () => {
   const [isLive, setIsLive] = useState(false);
   const [logsLoading, setLogsLoading] = useState(false);
 
+  // Clients pagination
+  const [clientsPage, setClientsPage] = useState(1);
+  const [totalClientsPages, setTotalClientsPages] = useState(1);
+
   // Social Media State
   const [socialPosts, setSocialPosts] = useState([]);
   const [socialLoading, setSocialLoading] = useState(false);
@@ -79,17 +83,34 @@ const SupaAdmin = () => {
     mediaFile: null, status: 'SCHEDULED', scheduledAt: ''
   });
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [showEditSocialModal, setShowEditSocialModal] = useState(false);
+  const [editingSocialPost, setEditingSocialPost] = useState(null);
+  const [showSocialDeleteConfirm, setShowSocialDeleteConfirm] = useState(false);
+  const [postToDelete, setPostToDelete] = useState(null);
+  const [socialEditForm, setSocialEditForm] = useState({
+    title: '', caption: '', hashtags: '', 
+    platforms: [], mediaFile: null, scheduledAt: '', recurring: 'none'
+  });
+  const [expandedClientId, setExpandedClientId] = useState(null);
+  const [copiedId, setCopiedId] = useState(null);
 
-  const fetchSocialPosts = useCallback(async (gId) => {
+  // Social pagination
+  const [socialPage, setSocialPage] = useState(1);
+  const [totalSocialPages, setTotalSocialPages] = useState(1);
+
+  const fetchSocialPosts = useCallback(async (gId, page = 1) => {
     if (!gId) return;
     try {
       setSocialLoading(true);
-      const res = await fetch(`/api/supaadmin/posts?gymId=${gId}`, {
+      const res = await fetch(`/api/supaadmin/posts?gymId=${gId}&page=${page}&limit=20`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
         const data = await res.json();
-        setSocialPosts(data.posts);
+        const posts = Array.isArray(data.posts) ? data.posts : (Array.isArray(data) ? data : []);
+        setSocialPosts(posts);
+        setTotalSocialPages(data.totalPages || 1);
+        setSocialPage(data.page || 1);
       }
     } catch (err) { console.error(err); } finally { setSocialLoading(false); }
   }, [token]);
@@ -129,15 +150,32 @@ const SupaAdmin = () => {
     } catch (err) { console.error(err); } finally { setLogsLoading(false); }
   }, [token, logFilters]);
 
-  const fetchClients = useCallback(async () => {
+  const openAddSocialModal = () => {
+    setSocialForm({
+      gymId: searchGymId,
+      title: '',
+      caption: '',
+      hashtags: '',
+      platforms: ['instagram', 'facebook', 'twitter', 'blogger'],
+      mediaFile: null,
+      status: 'SCHEDULED',
+      scheduledAt: ''
+    });
+    setShowSocialModal(true);
+  };
+
+  const fetchClients = useCallback(async (page = 1) => {
     try {
       setLoading(true);
-      const res = await fetch('/api/supaadmin/clients', {
+      const res = await fetch(`/api/supaadmin/clients?page=${page}&limit=10`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
         const data = await res.json();
-        setClients(data);
+        const clientList = Array.isArray(data.clients) ? data.clients : (Array.isArray(data) ? data : []);
+        setClients(clientList);
+        setTotalClientsPages(data.totalPages || 1);
+        setClientsPage(data.page || 1);
       }
     } catch (err) { console.error(err); } finally { setLoading(false); }
   }, [token]);
@@ -161,7 +199,7 @@ const SupaAdmin = () => {
     } catch (err) { console.error(err); }
   }, [token]);
 
-  const handleAddSocialPost = async (e) => {
+  const handleSubmitSocial = async (e) => {
     e.preventDefault();
     try {
       setSocialLoading(true);
@@ -174,7 +212,7 @@ const SupaAdmin = () => {
       formData.append('scheduledAt', socialForm.scheduledAt);
       if (socialForm.mediaFile) formData.append('media', socialForm.mediaFile);
 
-      const res = await fetch('/api/supaadmin/posts', {
+      const res = await fetch(`/api/supaadmin/posts/${socialForm.gymId}`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
@@ -196,15 +234,53 @@ const SupaAdmin = () => {
     } catch (err) { console.error(err); } finally { setSocialLoading(false); }
   };
 
-  const handleDeleteSocialPost = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this scheduled post?')) return;
+  const handleSaveSocialEdit = async (e) => {
+    e.preventDefault();
+    if (!editingSocialPost) return;
     try {
-      const res = await fetch(`/api/supaadmin/posts/${id}`, {
+      setSocialLoading(true);
+      const formData = new FormData();
+      formData.append('gymId', searchGymId);
+      formData.append('title', socialEditForm.title);
+      formData.append('caption', socialEditForm.caption);
+      formData.append('hashtags', socialEditForm.hashtags);
+      formData.append('platforms', JSON.stringify(socialEditForm.platforms));
+      formData.append('scheduledAt', socialEditForm.scheduledAt);
+      formData.append('recurring', socialEditForm.recurring);
+      if (socialEditForm.mediaFile) formData.append('media', socialEditForm.mediaFile);
+
+      const res = await fetch(`/api/supaadmin/posts/${searchGymId}/${editingSocialPost.id}`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+
+      if (res.ok) {
+        setShowEditSocialModal(false);
+        fetchSocialPosts(searchGymId);
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to update post');
+      }
+    } catch (err) { console.error(err); } finally { setSocialLoading(false); }
+  };
+
+  const confirmDeleteSocialPost = async () => {
+    if (!postToDelete) return;
+    try {
+      setSocialLoading(true);
+      const res = await fetch(`/api/supaadmin/posts/${postToDelete.id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (res.ok) fetchSocialPosts(searchGymId);
-    } catch (err) { console.error(err); }
+      if (res.ok) {
+        setShowSocialDeleteConfirm(false);
+        fetchSocialPosts(searchGymId);
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to delete post');
+      }
+    } catch (err) { console.error(err); } finally { setSocialLoading(false); }
   };
 
   const handleRetryPost = async (id) => {
@@ -225,33 +301,35 @@ const SupaAdmin = () => {
             <h2 style={{ fontSize: '24px', fontWeight: '700', margin: 0 }}>Social Media Scheduler</h2>
             <p className="text-secondary">Manage and schedule posts across all franchises</p>
           </div>
-          <button className="btn btn-primary" onClick={() => {
-            setSocialForm(prev => ({ ...prev, gymId: searchGymId }));
-            setShowSocialModal(true);
-          }}>
+          <button className="btn btn-primary" onClick={openAddSocialModal}>
             <Plus size={20} /> Add New Post
           </button>
         </div>
 
-        <div className="glass-card" style={{ padding: '20px', marginBottom: '20px' }}>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <div className="search-box flex-1" style={{ maxWidth: '500px' }}>
-              <Search size={18} />
-              <input 
-                type="text" 
-                placeholder="Enter Gym ID / UUID to manage posts..." 
-                value={searchGymId}
-                onChange={e => setSearchGymId(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && fetchSocialPosts(searchGymId)}
-              />
+        <div className="glass-card search-container animate-fade-in" style={{ padding: '24px', marginBottom: '24px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', alignItems: 'flex-end' }}>
+            <div className="input-group flex-1" style={{ marginBottom: 0 }}>
+              <label className="input-label" style={{ opacity: 0.7, fontSize: '12px' }}>Franchise Lookup</label>
+              <div className="search-box-wrapper">
+                <Search size={18} className="search-icon" />
+                <input 
+                  type="text" 
+                  className="input search-input"
+                  placeholder="Enter Gym ID / UUID (e.g. 123e4567...)" 
+                  value={searchGymId}
+                  onChange={e => setSearchGymId(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && fetchSocialPosts(searchGymId, 1)}
+                  style={{ paddingLeft: '40px' }}
+                />
+              </div>
             </div>
-            <button className="btn btn-secondary" onClick={() => fetchSocialPosts(searchGymId)}>
-              Search Posts
+            <button className="btn btn-secondary" style={{ height: '48px', padding: '0 25px' }} onClick={() => fetchSocialPosts(searchGymId, 1)}>
+              <TrendingUp size={18} style={{ marginRight: '8px' }} /> Fetch Posts
             </button>
           </div>
         </div>
 
-        <div className="glass-card" style={{ overflow: 'hidden' }}>
+        <div className="glass-card table-container-scroll" style={{ overflowX: 'auto', borderRadius: '12px' }}>
           <table className="supa-table">
             <thead>
               <tr>
@@ -269,10 +347,10 @@ const SupaAdmin = () => {
             <tbody>
               {socialLoading ? (
                 <tr><td colSpan="9" style={{ textAlign: 'center', padding: '40px' }}>Loading posts...</td></tr>
-              ) : socialPosts.length === 0 ? (
+              ) : (socialPosts || []).length === 0 ? (
                 <tr><td colSpan="9" style={{ textAlign: 'center', padding: '40px' }}>No posts found. Search for a Gym ID to see their scheduled content.</td></tr>
               ) : (
-                socialPosts.map((post, index) => (
+                (socialPosts || []).map((post, index) => (
                   <tr key={post.id}>
                     <td>{index + 1}</td>
                     <td style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{post.gymId}</td>
@@ -300,12 +378,29 @@ const SupaAdmin = () => {
                     </td>
                     <td>
                       <div className="action-group">
+                        <button className="icon-action text-accent" title="Edit Post" onClick={() => {
+                          setEditingSocialPost(post);
+                          setSocialEditForm({
+                            title: post.title,
+                            caption: post.caption,
+                            hashtags: post.hashtags || '',
+                            platforms: Array.isArray(post.platforms) ? post.platforms : JSON.parse(post.platforms || '[]'),
+                            scheduledAt: new Date(post.scheduledAt).toISOString().slice(0, 16),
+                            recurring: post.recurring || 'none'
+                          });
+                          setShowEditSocialModal(true);
+                        }}>
+                          <Edit3 size={16} />
+                        </button>
                         {post.status === 'FAILED' && (
-                          <button className="icon-action text-accent" title="Retry" onClick={() => handleRetryPost(post.id)}>
+                          <button className="icon-action text-warning" title="Retry" onClick={() => handleRetryPost(post.id)}>
                             <TrendingUp size={16} />
                           </button>
                         )}
-                        <button className="icon-action text-danger" title="Delete" onClick={() => handleDeleteSocialPost(post.id)}>
+                        <button className="icon-action text-danger" title="Delete" onClick={() => {
+                          setPostToDelete(post);
+                          setShowSocialDeleteConfirm(true);
+                        }}>
                           <Trash2 size={16} />
                         </button>
                       </div>
@@ -315,6 +410,30 @@ const SupaAdmin = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px' }}>
+          <div className="text-secondary" style={{ fontSize: '14px' }}>
+            Showing <b>{socialPosts.length}</b> posts — Page <b>{socialPage}</b> of <b>{totalSocialPages}</b>
+          </div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button 
+              className={`btn btn-secondary ${socialPage === 1 ? 'disabled' : ''}`} 
+              disabled={socialPage === 1}
+              onClick={() => fetchSocialPosts(searchGymId, socialPage - 1)}
+              style={{ padding: '8px 16px' }}
+            >
+              Previous
+            </button>
+            <button 
+              className={`btn btn-secondary ${socialPage >= totalSocialPages ? 'disabled' : ''}`} 
+              disabled={socialPage >= totalSocialPages}
+              onClick={() => fetchSocialPosts(searchGymId, socialPage + 1)}
+              style={{ padding: '8px 16px' }}
+            >
+              Next
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -338,8 +457,22 @@ const SupaAdmin = () => {
   }, [isLive, activeTab, fetchLogs, fetchLogStats]);
 
   useEffect(() => {
-    if (activeTab === 'logs') fetchLogs();
-  }, [activeTab, fetchLogs]);
+    if (activeTab === 'logs') {
+      fetchLogs();
+      fetchLogStats();
+    }
+  }, [activeTab, fetchLogs, fetchLogStats]);
+
+  // Auto-scroll logic for LIVE mode
+  useEffect(() => {
+    if (isLive && activeTab === 'logs' && logs.length > 0) {
+      const scrollArea = document.querySelector('.supa-scroll-area');
+      if (scrollArea) {
+        scrollArea.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+  }, [logs, isLive, activeTab]);
+
 
 
 
@@ -441,9 +574,16 @@ const SupaAdmin = () => {
     // Optimistic UI update — instant visual feedback, no waiting for server
     setClients(prev => prev.map(c => {
       if (c.id !== userId) return c;
-      const social = { ...(c.socialTokens || {}) };
-      social[platform] = { ...(social[platform] || {}), enabled };
-      return { ...c, socialTokens: social };
+      const gym = { ...(c.gym || {}) };
+      const social = { ...(gym.socialTokens || {}) };
+      
+      if (social[platform]) {
+        social[platform].enabled = enabled;
+      } else {
+        social[platform] = { token: '', enabled: enabled };
+      }
+      
+      return { ...c, gym: { ...gym, socialTokens: social } };
     }));
 
     try {
@@ -452,7 +592,6 @@ const SupaAdmin = () => {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ platform, enabled })
       });
-      // No full re-fetch needed — state is already updated
     } catch (err) {
       console.error(err);
       fetchClients(); // Revert on error
@@ -497,7 +636,7 @@ const SupaAdmin = () => {
   };
 
   const openEditModal = (client) => {
-    const social = client.socialTokens || {};
+    const social = client.gym?.socialTokens || {};
     setEditForm({
       id: client.id,
       name: client.name || '',
@@ -627,35 +766,75 @@ const SupaAdmin = () => {
   };
 
   const renderLogs = () => {
+    const getLevelIcon = (level) => {
+      switch (level) {
+        case 'ERROR': return <AlertCircle size={14} />;
+        case 'WARN': return <AlertTriangle size={14} />;
+        default: return <Info size={14} />;
+      }
+    };
+
+    const getActionColor = (action) => {
+      if (action.startsWith('POST_')) return '#3b82f6';
+      if (action.startsWith('CLIENT_')) return '#10b981';
+      if (action.startsWith('PLAN_')) return '#8b5cf6';
+      if (action.includes('DELETE')) return '#ef4444';
+      return 'var(--accent-color)';
+    };
+
     return (
       <div className="supa-content animate-fade-in">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
           <div>
             <h2 style={{ fontSize: '24px', fontWeight: '700', margin: 0 }}>System Audit Logs</h2>
-            <p className="text-secondary">Monitor platform activity and troubleshoot issues</p>
+            <p className="text-secondary">Monitor platform activity and troubleshoot issues in real-time</p>
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
-            <button className="btn btn-secondary" onClick={runCleanup}><Trash2 size={16} /> Cleanup &gt;90d</button>
-            <button className="btn btn-primary" onClick={exportLogs}><ScrollText size={16} /> Export CSV</button>
+            <button className="btn btn-secondary" style={{ gap: '8px' }} onClick={runCleanup}>
+               <Trash2 size={16} /> Cleanup >90d
+            </button>
+            <button className="btn btn-primary" style={{ gap: '8px' }} onClick={exportLogs}>
+               <ScrollText size={16} /> Export CSV
+            </button>
           </div>
         </div>
 
         <div className="stats-strip">
-          <div className="glass-card" style={{ padding: '15px' }}>
-            <div className="stat-label" style={{ fontSize: '11px', opacity: 0.6 }}>LOGS TODAY</div>
-            <div style={{ fontSize: '24px', fontWeight: '800' }}>{logStats.totalToday}</div>
+          <div className="glass-card stat-card-premium">
+            <div className="stat-icon-wrapper" style={{ color: 'var(--accent-color)' }}>
+              <Activity size={24} />
+            </div>
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: '700', opacity: 0.5, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Logs Today</div>
+              <div style={{ fontSize: '24px', fontWeight: '800' }}>{logStats.totalToday}</div>
+            </div>
           </div>
-          <div className="glass-card" style={{ padding: '15px', borderLeft: '3px solid #ff4d4f' }}>
-            <div className="stat-label" style={{ fontSize: '11px', opacity: 0.6 }}>ERRORS TODAY</div>
-            <div style={{ fontSize: '24px', fontWeight: '800', color: logStats.errorsToday > 0 ? '#ff4d4f' : 'inherit' }}>{logStats.errorsToday}</div>
+          <div className="glass-card stat-card-premium" style={{ borderLeft: '3px solid #ff4d4f' }}>
+            <div className="stat-icon-wrapper" style={{ color: '#ff4d4f', background: 'rgba(255, 77, 79, 0.05)' }}>
+              <AlertCircle size={24} />
+            </div>
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: '700', opacity: 0.5, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Errors Today</div>
+              <div style={{ fontSize: '24px', fontWeight: '800', color: logStats.errorsToday > 0 ? '#ff4d4f' : 'inherit' }}>{logStats.errorsToday}</div>
+            </div>
           </div>
-          <div className="glass-card" style={{ padding: '15px', borderLeft: '3px solid #f5a623' }}>
-            <div className="stat-label" style={{ fontSize: '11px', opacity: 0.6 }}>WARNINGS TODAY</div>
-            <div style={{ fontSize: '24px', fontWeight: '800', color: logStats.warningsToday > 0 ? '#f5a623' : 'inherit' }}>{logStats.warningsToday}</div>
+          <div className="glass-card stat-card-premium" style={{ borderLeft: '3px solid #f5a623' }}>
+            <div className="stat-icon-wrapper" style={{ color: '#f5a623', background: 'rgba(245, 166, 35, 0.05)' }}>
+              <AlertTriangle size={24} />
+            </div>
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: '700', opacity: 0.5, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Warnings Today</div>
+              <div style={{ fontSize: '24px', fontWeight: '800', color: logStats.warningsToday > 0 ? '#f5a623' : 'inherit' }}>{logStats.warningsToday}</div>
+            </div>
           </div>
-          <div className="glass-card" style={{ padding: '15px' }}>
-            <div className="stat-label" style={{ fontSize: '11px', opacity: 0.6 }}>ACTIVE GYMS</div>
-            <div style={{ fontSize: '24px', fontWeight: '800' }}>{logStats.activeGymsToday}</div>
+          <div className="glass-card stat-card-premium">
+            <div className="stat-icon-wrapper" style={{ color: '#8b5cf6', background: 'rgba(139, 92, 246, 0.05)' }}>
+              <Users size={24} />
+            </div>
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: '700', opacity: 0.5, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Active Gyms</div>
+              <div style={{ fontSize: '24px', fontWeight: '800' }}>{logStats.activeGymsToday}</div>
+            </div>
           </div>
         </div>
 
@@ -666,7 +845,7 @@ const SupaAdmin = () => {
               type="text" 
               className="input" 
               placeholder="Search Gym ID / Action / Message..." 
-              style={{ paddingLeft: '36px', height: '40px' }}
+              style={{ paddingLeft: '36px', height: '50px' }}
               value={logFilters.gymId || logFilters.search}
               onChange={(e) => setLogFilters({ ...logFilters, gymId: e.target.value, search: e.target.value, page: 1 })}
             />
@@ -674,19 +853,19 @@ const SupaAdmin = () => {
           
           <select 
             className="input" 
-            style={{ width: '140px', height: '40px' }}
+            style={{ width: '160px', height: '50px', background: 'rgba(255,255,255,0.05)', color: 'white', fontWeight: '600', cursor: 'pointer', fontSize: '13px' }}
             value={logFilters.level}
             onChange={(e) => setLogFilters({ ...logFilters, level: e.target.value, page: 1 })}
           >
-            <option value="ALL">All Levels</option>
-            <option value="INFO">INFO</option>
-            <option value="WARN">WARN</option>
-            <option value="ERROR">ERROR</option>
+            <option value="ALL" style={{ background: '#111', color: 'white' }}>ALL LEVELS</option>
+            <option value="INFO" style={{ background: '#111', color: '#00ffaa' }}>● INFO</option>
+            <option value="WARN" style={{ background: '#111', color: '#f5a623' }}>● WARN</option>
+            <option value="ERROR" style={{ background: '#111', color: '#ff4d4f' }}>● ERROR</option>
           </select>
 
           <button 
             className={`btn ${isLive ? 'btn-primary' : 'btn-secondary'}`} 
-            style={{ height: '40px', gap: '8px' }}
+            style={{ height: '50px', gap: '8px', minWidth: '130px' }}
             onClick={() => setIsLive(!isLive)}
           >
             {isLive && <span className="live-dot" />}
@@ -700,8 +879,8 @@ const SupaAdmin = () => {
               <tr className="log-row-compact">
                 <th style={{ width: '120px' }}>TIME</th>
                 <th style={{ width: '100px' }}>LEVEL</th>
-                <th style={{ width: '180px' }}>GYM ID</th>
-                <th style={{ width: '180px' }}>ACTION</th>
+                <th style={{ width: '250px' }}>GYM ID</th>
+                <th style={{ width: '200px' }}>ACTION</th>
                 <th>MESSAGE</th>
                 <th style={{ width: '50px' }}></th>
               </tr>
@@ -709,52 +888,94 @@ const SupaAdmin = () => {
             <tbody>
               {logs.length === 0 ? (
                 <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', padding: '40px', opacity: 0.5 }}>
-                    {logsLoading ? 'Loading logs...' : 'No logs found matching filters.'}
+                  <td colSpan="6" style={{ textAlign: 'center', padding: '60px', opacity: 0.5 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
+                      <Activity size={40} style={{ opacity: 0.2 }} />
+                      <span>{logsLoading ? 'Synchronizing platform stream...' : 'No system logs recorded for this period.'}</span>
+                    </div>
                   </td>
                 </tr>
               ) : (
-                logs.map(log => (
-                  <React.Fragment key={log.id}>
-                    <tr className="log-row-compact h-hover" style={{ cursor: 'pointer' }} onClick={() => setExpandedLogId(expandedLogId === log.id ? null : log.id)}>
-                      <td className="log-monospace" title={formatTime(log.createdAt, true)}>
-                        {formatTime(log.createdAt)}
-                      </td>
-                      <td>
-                        <span className={`log-badge ${log.level.toLowerCase()}`}>
-                          {log.level}
-                        </span>
-                      </td>
-                      <td className="log-monospace" style={{ fontSize: '11px', opacity: 0.7 }}>{log.gymId || '-'}</td>
-                      <td>
-                        <span style={{ padding: '2px 6px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', fontSize: '11px', color: 'var(--accent-color)' }}>
-                          {log.action}
-                        </span>
-                      </td>
-                      <td className="text-secondary" style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {log.message}
-                      </td>
-                      <td>
-                        {expandedLogId === log.id ? <Plus size={16} style={{ transform: 'rotate(45deg)', transition: '0.3s' }} /> : <Plus size={16} style={{ transition: '0.3s' }} />}
-                      </td>
-                    </tr>
-                    {expandedLogId === log.id && (
-                      <tr className="log-expand-panel">
-                        <td colSpan="6">
-                          <div className="animate-fade-in" style={{ padding: '10px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                              <span style={{ fontSize: '12px', fontWeight: '600' }}>{formatTime(log.createdAt, true)}</span>
-                              <span className="text-secondary">Log ID: {log.id}</span>
-                            </div>
-                            <pre className="log-monospace" style={{ fontSize: '12px', background: 'rgba(0,0,0,0.5)', padding: '15px', borderRadius: '8px' }}>
-                              {JSON.stringify(log.metadata || {}, null, 2)}
-                            </pre>
-                          </div>
+                logs.map(log => {
+                  const isExpanded = expandedLogId === log.id;
+                  return (
+                    <React.Fragment key={log.id}>
+                      <tr 
+                        className={`log-row-compact h-hover ${isExpanded ? 'log-expand-active' : ''}`} 
+                        style={{ cursor: 'pointer' }} 
+                        onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                      >
+                        <td className="log-monospace" style={{ fontSize: '11px', opacity: 0.7 }}>
+                          {formatTime(log.createdAt)}
+                        </td>
+                        <td>
+                          <span className={`log-badge ${log.level.toLowerCase()}`} style={{ display: 'flex', alignItems: 'center', gap: '4px', width: 'fit-content' }}>
+                            {getLevelIcon(log.level)} {log.level}
+                          </span>
+                        </td>
+                        <td>
+                          {log.gymId ? (
+                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span className="log-monospace" style={{ fontSize: '10px', opacity: 0.6 }}>{log.gymId}</span>
+                                <button 
+                                  className="icon-action" 
+                                  style={{ padding: '2px', opacity: copiedId === log.gymId ? 1 : 0.3, color: copiedId === log.gymId ? 'var(--accent-color)' : 'inherit' }} 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigator.clipboard.writeText(log.gymId);
+                                    setCopiedId(log.gymId);
+                                    setTimeout(() => setCopiedId(null), 2000);
+                                  }}
+                                >
+                                  {copiedId === log.gymId ? <Check size={10} /> : <Copy size={10} />}
+                                </button>
+                             </div>
+                          ) : <span style={{ opacity: 0.3 }}>-</span>}
+                        </td>
+                        <td>
+                          <span className="log-action-pill" style={{ color: getActionColor(log.action), borderColor: `${getActionColor(log.action)}33` }}>
+                            {log.action}
+                          </span>
+                        </td>
+                        <td className="text-secondary" style={{ maxWidth: '400px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '13px' }}>
+                          {log.message}
+                        </td>
+                        <td>
+                          <Plus size={16} style={{ transform: isExpanded ? 'rotate(45deg)' : 'none', transition: '0.3s', opacity: 0.4 }} />
                         </td>
                       </tr>
-                    )}
-                  </React.Fragment>
-                ))
+                      {isExpanded && (
+                        <tr className="log-expand-panel">
+                          <td colSpan="6">
+                            <div className="animate-fade-in" style={{ padding: '20px', background: 'rgba(0,0,0,0.2)' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '10px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                  <span style={{ fontSize: '14px', fontWeight: '700' }}>Event Details</span>
+                                  <span className="log-badge info" style={{ fontSize: '10px' }}>ID: {log.id}</span>
+                                </div>
+                                <span style={{ fontSize: '12px', opacity: 0.5 }}><Calendar size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> {new Date(log.createdAt).toLocaleString()}</span>
+                              </div>
+                              
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '4px' }}>
+                                {Object.entries(log.metadata || {}).map(([key, value]) => (
+                                  <div key={key} className="metadata-item">
+                                    <span className="metadata-key">{key.replace(/([A-Z])/g, ' $1')}</span>
+                                    <span className="metadata-value">
+                                      {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                    </span>
+                                  </div>
+                                ))}
+                                {(!log.metadata || Object.keys(log.metadata).length === 0) && (
+                                  <div className="text-italic" style={{ opacity: 0.4, fontSize: '12px' }}>No additional metadata recorded for this event.</div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -762,20 +983,22 @@ const SupaAdmin = () => {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px' }}>
           <div className="text-secondary" style={{ fontSize: '14px' }}>
-            Page {logFilters.page} of {totalPages}
+            Showing <b>{logs.length}</b> events per page — Page <b>{logFilters.page}</b>
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button 
               className="btn btn-secondary" 
               disabled={logFilters.page === 1}
               onClick={() => setLogFilters({ ...logFilters, page: logFilters.page - 1 })}
+              style={{ padding: '8px 16px' }}
             >
               Previous
             </button>
             <button 
               className="btn btn-secondary" 
-              disabled={logFilters.page === totalPages}
+              disabled={logFilters.page >= totalPages}
               onClick={() => setLogFilters({ ...logFilters, page: logFilters.page + 1 })}
+              style={{ padding: '8px 16px' }}
             >
               Next
             </button>
@@ -1001,108 +1224,211 @@ const SupaAdmin = () => {
     );
   };
 
-  const renderClients = () => (
-    <div className="supa-content animate-fade-in">
-      <div className="clients-header mb-4" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2>Franchise Clients</h2>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button className="btn btn-primary" onClick={() => setShowModal(true)}><Plus size={16} /> Add Client</button>
+  const renderClients = () => {
+    return (
+      <div className="supa-content animate-fade-in">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+          <div>
+            <h2 style={{ fontSize: '24px', fontWeight: '700', margin: 0 }}>Franchise Client Management</h2>
+            <p className="text-secondary">Monitor connectivity, subscriptions, and security for your partners</p>
+          </div>
+          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+            <Plus size={20} /> Add New Client
+          </button>
         </div>
-      </div>
 
-      <div className="table-container glass-card" style={{ padding: 0, overflowX: 'auto' }}>
-        <table className="supa-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Client ID</th>
-              <th>Client Name</th>
-              <th>Business Name</th>
-              <th>Email</th>
-              <th>Joined Date</th>
-              <th>Mobile Number</th>
-              <th>Subscribed Plan</th>
-              <th>Plan Status</th>
-              <th>Social Media</th>
-              <th>Token</th>
-              <th>Social Action</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {clients.map((c, idx) => {
-              const platforms = [
-                { id: 'instagram', label: 'Instagram', icon: <Instagram size={14} /> },
-                { id: 'facebook', label: 'Facebook', icon: <Facebook size={14} /> },
-                { id: 'twitter', label: 'Twitter/X', icon: <Twitter size={14} /> },
-                { id: 'blogger', label: 'Blogger/Web', icon: <Globe size={14} /> }
-              ];
-              const social = c.socialTokens || {};
+        <div className="table-container glass-card" style={{ padding: 0 }}>
+          <table className="supa-table">
+            <thead>
+              <tr>
+                <th style={{ width: '50px' }}>#</th>
+                <th>Franchise / Gym Name</th>
+                <th>Owner Name</th>
+                <th>Email Address</th>
+                <th>Subs. Plan</th>
+                <th>Status</th>
+                <th>Joined</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(clients || []).map((c, idx) => {
+                const platforms = [
+                  { id: 'instagram', label: 'Instagram', icon: <Instagram size={14} /> },
+                  { id: 'facebook', label: 'Facebook', icon: <Facebook size={14} /> },
+                  { id: 'twitter', label: 'Twitter/X', icon: <Twitter size={14} /> },
+                  { id: 'blogger', label: 'Blogger/Web', icon: <Globe size={14} /> }
+                ];
+                const social = c.gym?.socialTokens || {};
+                const isExpanded = expandedClientId === c.id;
 
-              return platforms.map((p, pIdx) => (
-                <tr key={`${c.id}-${p.id}`} className={social[p.id]?.token && !social[p.id]?.enabled ? 'social-row-disabled' : ''}>
-                  {pIdx === 0 && (
-                    <>
-                      <td rowSpan={4}>{idx + 1}</td>
-                      <td rowSpan={4} style={{ fontSize: '11px', color: 'var(--accent-color)', fontFamily: 'monospace', cursor: 'pointer' }} title="Click to copy Gym ID" onClick={() => { navigator.clipboard.writeText(c.gymId); alert('Gym ID copied!'); }}>
-                        {c.gymId}
+                return (
+                  <React.Fragment key={c.id}>
+                    <tr 
+                      className={`h-hover ${isExpanded ? 'client-row-selected' : ''}`} 
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => setExpandedClientId(isExpanded ? null : c.id)}
+                    >
+                      <td>{(clientsPage - 1) * 10 + idx + 1}</td>
+                      <td>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontWeight: '700', color: 'var(--accent-color)' }}>{c.gym?.name || 'Unassigned'}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '10px', opacity: 0.5, fontFamily: 'monospace' }}>{c.gymId}</span>
+                            <button 
+                              className="icon-action" 
+                              style={{ padding: '2px', opacity: copiedId === c.gymId ? 1 : 0.4, color: copiedId === c.gymId ? 'var(--accent-color)' : 'inherit' }} 
+                              title="Copy Gym ID" 
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                navigator.clipboard.writeText(c.gymId); 
+                                setCopiedId(c.gymId);
+                                setTimeout(() => setCopiedId(null), 2000);
+                              }}
+                            >
+                              {copiedId === c.gymId ? <Check size={10} /> : <Copy size={10} />}
+                            </button>
+                          </div>
+                        </div>
                       </td>
-                      <td rowSpan={4}>{c.name}</td>
-                      <td rowSpan={4} className="text-accent" style={{ fontWeight: '500' }}>{c.gym?.name || 'N/A'}</td>
-                      <td rowSpan={4} style={{ fontSize: '13px' }}>{c.email}</td>
-                      <td rowSpan={4}>{new Date(c.createdAt).toISOString().split('T')[0]}</td>
-                      <td rowSpan={4}>{c.phone || '+1 (555) 000-0000'}</td>
-                      <td rowSpan={4}>{c.subscriptionPlan || 'Premium'}</td>
-                      <td rowSpan={4}>
+                      <td style={{ fontWeight: '500' }}>{c.name}</td>
+                      <td style={{ fontSize: '13px' }}>{c.email}</td>
+                      <td>
+                         <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                           {c.subscriptionPlan || 'Premium'}
+                         </span>
+                      </td>
+                      <td>
                         <span className={`status-badge ${c.subscriptionStatus === 'Inactive' ? 'danger' : 'success'}`}>
                           {c.subscriptionStatus || 'Active'}
                         </span>
                       </td>
-                    </>
-                  )}
-                  <td className="social-platform-label">
-                    {p.icon} {p.label}
-                  </td>
-                  <td style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                    {social[p.id]?.token ? (
-                      <span className={!social[p.id].enabled ? 'text-secondary' : ''}>{social[p.id].token}</span>
-                    ) : (
-                      <span className="text-italic">Not Connected</span>
+                      <td style={{ fontSize: '12px', opacity: 0.7 }}>{new Date(c.createdAt).toLocaleDateString()}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                           <button className="icon-action text-accent" title="Edit Client" onClick={(e) => { e.stopPropagation(); openEditModal(c); }}>
+                             <Edit size={16} />
+                           </button>
+                           <button className="icon-action text-danger" title="Delete Client" onClick={(e) => { e.stopPropagation(); handleDeleteClient(c.id, c.name); }}>
+                             <Trash2 size={16} />
+                           </button>
+                           <Plus size={16} style={{ transform: isExpanded ? 'rotate(45deg)' : 'none', transition: '0.3s', opacity: 0.5, marginLeft: '5px' }} />
+                        </div>
+                      </td>
+                    </tr>
+                    
+                    {isExpanded && (
+                      <tr className="client-expand-panel">
+                        <td colSpan="8">
+                          <div className="animate-fade-in client-details-grid">
+                            {platforms.map(p => (
+                              <div key={p.id} className="social-toggle-card">
+                                <div className="social-toggle-header">
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600', fontSize: '13px' }}>
+                                    {p.icon} {p.label}
+                                  </div>
+                                  {social[p.id]?.token && (
+                                    <label className="toggle-switch">
+                                      <input
+                                        type="checkbox"
+                                        checked={social[p.id]?.enabled}
+                                        onChange={(e) => handleSocialToggle(c.id, p.id, e.target.checked)}
+                                      />
+                                      <span className="slider"></span>
+                                    </label>
+                                  )}
+                                </div>
+                                
+                                {social[p.id]?.token ? (
+                                  <div className="social-token-display">
+                                    <div style={{ fontSize: '9px', textTransform: 'uppercase', opacity: 0.5, marginBottom: '4px' }}>Access Token</div>
+                                    <div className="truncate-text" style={{ fontSize: '10px' }}>{social[p.id].token}</div>
+                                  </div>
+                                ) : (
+                                  <div style={{ padding: '10px', textAlign: 'center', fontSize: '11px', opacity: 0.4, fontStyle: 'italic' }}>
+                                    Platform Not Connected
+                                  </div>
+                                )}
+
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
+                                   <span style={{ fontSize: '10px', color: social[p.id]?.enabled ? 'var(--accent-color)' : 'var(--text-secondary)' }}>
+                                      {social[p.id]?.enabled ? '● Active' : '○ Disabled'}
+                                   </span>
+                                   <button 
+                                     className="btn btn-secondary btn-sm" 
+                                     style={{ padding: '2px 8px', fontSize: '10px' }}
+                                     onClick={(e) => { e.stopPropagation(); openEditModal(c); }}
+                                   >
+                                     Update
+                                   </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          
+                          <div style={{ padding: '0 20px 20px 20px', display: 'flex', gap: '20px' }}>
+                            <div className="glass-card" style={{ flex: 1, padding: '15px', background: 'rgba(255,255,255,0.02)' }}>
+                               <div style={{ fontSize: '11px', fontWeight: '700', marginBottom: '10px', textTransform: 'uppercase', opacity: 0.5 }}>Quick Actions</div>
+                               <div style={{ display: 'flex', gap: '10px' }}>
+                                  <button className="btn btn-secondary btn-sm" style={{ gap: '6px' }} onClick={() => { setTargetId(c.id); setShowPassModal(true); }}>
+                                    <Key size={14} /> Change Password
+                                  </button>
+                                  <button className="btn btn-secondary btn-sm" style={{ gap: '6px' }} onClick={() => setShowLogoModal(c.gym?.logoUrl)} disabled={!c.gym?.logoUrl}>
+                                    <Eye size={14} /> {c.gym?.logoUrl ? 'View Business Logo' : 'No Logo Uploaded'}
+                                  </button>
+                               </div>
+                            </div>
+                            <div className="glass-card" style={{ flex: 1, padding: '15px', background: 'rgba(255,255,255,0.02)' }}>
+                               <div style={{ fontSize: '11px', fontWeight: '700', marginBottom: '10px', textTransform: 'uppercase', opacity: 0.5 }}>Contact Details</div>
+                               <div style={{ fontSize: '13px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
+                                    <Phone size={14} opacity={0.6} /> {c.phone || '+1 (555) 000-0000'}
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Mail size={14} opacity={0.6} /> {c.email}
+                                  </div>
+                               </div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
                     )}
-                  </td>
-                  <td>
-                    {social[p.id]?.token && (
-                      <label className="toggle-switch">
-                        <input
-                          type="checkbox"
-                          checked={social[p.id]?.enabled}
-                          onChange={(e) => handleSocialToggle(c.id, p.id, e.target.checked)}
-                        />
-                        <span className="slider"></span>
-                      </label>
-                    )}
-                  </td>
-                  {pIdx === 0 && (
-                    <td rowSpan={4}>
-                      <div style={{ display: 'flex', gap: '5px' }}>
-                        <button className="icon-action text-accent" title="Edit Client" onClick={() => openEditModal(c)}><Edit size={16} /></button>
-                        <button className="icon-action" style={{ color: '#00ffaa' }} title="Preview Logo" onClick={() => setShowLogoModal(c.gym?.logoUrl)} disabled={!c.gym?.logoUrl}><Eye size={16} /></button>
-                        <button className="icon-action" style={{ color: '#faad14' }} title="Change Password" onClick={() => { setTargetId(c.id); setShowPassModal(true); }}><Key size={16} /></button>
-                        <button className="icon-action text-danger" title="Delete Client" onClick={() => handleDeleteClient(c.id, c.name)}><Trash2 size={16} /></button>
-                      </div>
-                    </td>
-                  )}
-                </tr>
-              ));
-            })}
-            {clients.length === 0 && (
-              <tr><td colSpan="13" style={{ textAlign: 'center', padding: '20px' }}>No clients found.</td></tr>
-            )}
-          </tbody>
-        </table>
+                  </React.Fragment>
+                );
+              })}
+              {clients.length === 0 && (
+                <tr><td colSpan="8" style={{ textAlign: 'center', padding: '40px', opacity: 0.5 }}>No clients found.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px' }}>
+          <div className="text-secondary" style={{ fontSize: '14px' }}>
+            Showing <b>{clients.length}</b> franchises — Page <b>{clientsPage}</b> of <b>{totalClientsPages}</b>
+          </div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button 
+              className={`btn btn-secondary ${clientsPage === 1 ? 'disabled' : ''}`} 
+              disabled={clientsPage === 1}
+              onClick={() => fetchClients(clientsPage - 1)}
+              style={{ padding: '8px 16px' }}
+            >
+              Previous
+            </button>
+            <button 
+              className={`btn btn-secondary ${clientsPage >= totalClientsPages ? 'disabled' : ''}`} 
+              disabled={clientsPage >= totalClientsPages}
+              onClick={() => fetchClients(clientsPage + 1)}
+              style={{ padding: '8px 16px' }}
+            >
+              Next
+            </button>
+          </div>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
 
 
@@ -1126,29 +1452,259 @@ const SupaAdmin = () => {
           {activeTab === 'logs' && renderLogs()}
         </div>
       </div>
-      {showSocialModal && (
+      {showEditSocialModal && (
         <div className="modal-overlay">
-          <div className="modal-content glass animate-scale-in" style={{ maxWidth: '600px' }}>
-            <div className="modal-header">
-              <h3>Schedule New Post</h3>
-              <button className="close-btn" onClick={() => setShowSocialModal(false)}>×</button>
+          <div className="modal-content glass-card animate-fade-in" style={{ maxWidth: '650px', width: '100%', maxHeight: '95vh', overflowY: 'auto', padding: '0' }}>
+            <div style={{ padding: '24px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Edit3 size={20} className="text-accent" /> Edit Scheduled Post
+                </h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>Modify the campaign details below</p>
+              </div>
+              <button 
+                className="modal-close-btn" 
+                onClick={() => setShowEditSocialModal(false)}
+              >
+                <X size={18} />
+              </button>
             </div>
             
-            <form onSubmit={handleAddSocialPost} className="supa-form">
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+            <form onSubmit={handleSaveSocialEdit} style={{ padding: '24px' }}>
+              <div className="platform-selection">
+                <p style={{ width: '100%', fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>Publish To:</p>
+                {[
+                  { id: 'instagram', icon: <Instagram size={16} /> },
+                  { id: 'facebook', icon: <Facebook size={16} /> },
+                  { id: 'twitter', icon: <Twitter size={16} /> },
+                  { id: 'blogger', icon: <Globe size={16} /> }
+                ].map(p => (
+                  <div 
+                    key={p.id}
+                    className={`platform-pill ${socialEditForm.platforms.includes(p.id) ? 'selected' : ''}`}
+                    onClick={() => {
+                      const platforms = [...socialEditForm.platforms];
+                      if (platforms.includes(p.id)) {
+                        setSocialEditForm({ ...socialEditForm, platforms: platforms.filter(x => x !== p.id) });
+                      } else {
+                        setSocialEditForm({ ...socialEditForm, platforms: [...platforms, p.id] });
+                      }
+                    }}
+                  >
+                    {p.icon} <span style={{ textTransform: 'capitalize' }}>{p.id}</span>
+                    {socialEditForm.platforms.includes(p.id) && <Check size={14} />}
+                  </div>
+                ))}
+              </div>
+
+              <div className="modal-grid" style={{ marginBottom: '20px' }}>
                 <div className="input-group">
-                  <label className="input-label">Gym ID / UUID</label>
+                  <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Type size={14} /> Post Title</label>
                   <input 
                     type="text" 
                     className="input" 
-                    placeholder="Enter Gym UUID..." 
-                    value={socialForm.gymId} 
-                    onChange={e => setSocialForm({ ...socialForm, gymId: e.target.value })} 
+                    value={socialEditForm.title} 
+                    onChange={e => setSocialEditForm({ ...socialEditForm, title: e.target.value })} 
                     required 
                   />
                 </div>
                 <div className="input-group">
-                  <label className="input-label">Post Title</label>
+                  <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Calendar size={14} /> Schedule Date & Time</label>
+                  <input 
+                    type="datetime-local" 
+                    className="input" 
+                    value={socialEditForm.scheduledAt}
+                    onChange={e => setSocialEditForm({ ...socialEditForm, scheduledAt: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="input-group">
+                <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MessageCircle size={14} /> Caption</label>
+                <textarea 
+                  className="input" 
+                  rows="4" 
+                  value={socialEditForm.caption}
+                  onChange={e => setSocialEditForm({ ...socialEditForm, caption: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="modal-grid" style={{ marginBottom: '20px' }}>
+                <div className="input-group">
+                  <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Hash size={14} /> Hashtags</label>
+                  <input 
+                    type="text" 
+                    className="input" 
+                    value={socialEditForm.hashtags}
+                    onChange={e => setSocialEditForm({ ...socialEditForm, hashtags: e.target.value })}
+                  />
+                </div>
+                <div className="input-group">
+                  <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Repeat size={14} /> Recurring</label>
+                  <select 
+                    className="input" 
+                    value={socialEditForm.recurring}
+                    onChange={e => setSocialEditForm({ ...socialEditForm, recurring: e.target.value })}
+                  >
+                    <option value="none">One-time Post</option>
+                    <option value="weekly">Every Week</option>
+                    <option value="monthly">Every Month</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="input-group" style={{ marginBottom: '24px' }}>
+                <label className="input-label">Update Media (Optional)</label>
+                <div 
+                  className="drag-drop-zone glass"
+                  onClick={() => document.getElementById('edit-social-file').click()}
+                  style={{ minHeight: '100px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                >
+                  <ImageIcon size={20} className="text-accent" />
+                  <p style={{ margin: 0, fontSize: '13px' }}>{socialEditForm.mediaFile ? socialEditForm.mediaFile.name : 'Click to change image/video'}</p>
+                  <input 
+                    id="edit-social-file" 
+                    type="file" 
+                    hidden 
+                    accept="image/*,video/mp4" 
+                    onChange={e => setSocialEditForm({ ...socialEditForm, mediaFile: e.target.files[0] })} 
+                  />
+                </div>
+                
+                {socialEditForm.mediaFile && (
+                  <div className="media-preview-large animate-fade-in">
+                    {socialEditForm.mediaFile.type?.startsWith('video') ? (
+                       <video src={URL.createObjectURL(socialEditForm.mediaFile)} controls />
+                    ) : (
+                       <img src={URL.createObjectURL(socialEditForm.mediaFile)} alt="Preview" />
+                    )}
+                    <button 
+                      type="button" 
+                      className="remove-media-overlay"
+                      onClick={(e) => { e.stopPropagation(); setSocialEditForm({ ...socialEditForm, mediaFile: null }); }}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                )}
+                
+                {!socialEditForm.mediaFile && editingSocialPost?.mediaUrl && (
+                  <div className="media-preview-large animate-fade-in">
+                    {editingSocialPost.mediaType === 'video' ? (
+                      <video src={editingSocialPost.mediaUrl} controls />
+                    ) : (
+                      <img src={editingSocialPost.mediaUrl} alt="Existing" />
+                    )}
+                    <p style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.5)', margin: 0, padding: '4px', fontSize: '10px', textAlign: 'center' }}>Current Media</p>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button type="button" className="btn btn-secondary flex-1" onClick={() => setShowEditSocialModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary flex-1" disabled={socialLoading || socialEditForm.platforms.length === 0} style={{ height: '48px', fontSize: '15px' }}>
+                  {socialLoading ? 'Updating...' : 'Save Changes ✨'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showSocialDeleteConfirm && (
+        <div className="modal-overlay" style={{ zIndex: 10001 }}>
+          <div className="modal-content glass animate-scale-in" style={{ maxWidth: '400px', textAlign: 'center', padding: '30px' }}>
+            <div className="delete-icon-wrapper" style={{ marginBottom: '20px', color: 'var(--danger-color)' }}>
+              <Trash2 size={48} strokeWidth={1.5} />
+            </div>
+            <h3 style={{ marginBottom: '10px' }}>Confirm Deletion</h3>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '25px', lineHeight: '1.5' }}>
+              Are you sure you want to delete this scheduled post? <br/>
+              <strong>"{postToDelete?.title}"</strong><br/>
+              This action cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button 
+                className="btn btn-secondary flex-1" 
+                onClick={() => setShowSocialDeleteConfirm(false)}
+                disabled={socialLoading}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn btn-danger flex-1" 
+                onClick={confirmDeleteSocialPost}
+                disabled={socialLoading}
+              >
+                {socialLoading ? 'Deleting...' : 'Delete Post'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSocialModal && (
+        <div className="modal-overlay">
+          <div className="modal-content glass-card animate-fade-in" style={{ maxWidth: '650px', width: '100%', maxHeight: '95vh', overflowY: 'auto', padding: '0' }}>
+            <div style={{ padding: '24px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Zap size={20} className="text-accent" /> Schedule New Post
+                </h3>
+                <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>Create and schedule content for your franchises</p>
+              </div>
+              <button 
+                className="modal-close-btn" 
+                onClick={() => setShowSocialModal(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitSocial} style={{ padding: '24px' }}>
+              <div className="platform-selection">
+                <p style={{ width: '100%', fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>Publish To:</p>
+                {[
+                  { id: 'instagram', icon: <Instagram size={16} /> },
+                  { id: 'facebook', icon: <Facebook size={16} /> },
+                  { id: 'twitter', icon: <Twitter size={16} /> },
+                  { id: 'blogger', icon: <Globe size={16} /> }
+                ].map(p => (
+                  <div 
+                    key={p.id}
+                    className={`platform-pill ${socialForm.platforms.includes(p.id) ? 'selected' : ''}`}
+                    onClick={() => {
+                      const platforms = [...socialForm.platforms];
+                      if (platforms.includes(p.id)) {
+                        setSocialForm({ ...socialForm, platforms: platforms.filter(x => x !== p.id) });
+                      } else {
+                        setSocialForm({ ...socialForm, platforms: [...platforms, p.id] });
+                      }
+                    }}
+                  >
+                    {p.icon} <span style={{ textTransform: 'capitalize' }}>{p.id}</span>
+                    {socialForm.platforms.includes(p.id) && <Check size={14} />}
+                  </div>
+                ))}
+              </div>
+
+              <div className="modal-grid" style={{ marginBottom: '20px' }}>
+                <div className="input-group">
+                  <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Key size={14} /> Gym ID / UUID</label>
+                  <input 
+                    type="text" 
+                    className="input" 
+                    placeholder="Auto-filled from search..."
+                    value={socialForm.gymId} 
+                    onChange={e => setSocialForm({ ...socialForm, gymId: e.target.value })} 
+                    required 
+                    style={{ background: 'rgba(255,255,255,0.02)' }}
+                  />
+                </div>
+                <div className="input-group">
+                  <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Type size={14} /> Post Title</label>
                   <input 
                     type="text" 
                     className="input" 
@@ -1161,11 +1717,11 @@ const SupaAdmin = () => {
               </div>
 
               <div className="input-group">
-                <label className="input-label">Caption</label>
+                <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MessageCircle size={14} /> Caption</label>
                 <textarea 
                   className="input" 
-                  rows="3" 
-                  placeholder="Enter caption for the post..." 
+                  rows="4" 
+                  placeholder="What's on your mind? #fitness #goals..." 
                   value={socialForm.caption}
                   onChange={e => setSocialForm({ ...socialForm, caption: e.target.value })}
                   required
@@ -1173,7 +1729,7 @@ const SupaAdmin = () => {
               </div>
 
               <div className="input-group">
-                <label className="input-label">Hashtags (Optional)</label>
+                <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Hash size={14} /> Hashtags (Optional)</label>
                 <input 
                   type="text" 
                   className="input" 
@@ -1183,9 +1739,9 @@ const SupaAdmin = () => {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              <div className="modal-grid" style={{ marginBottom: '20px' }}>
                 <div className="input-group">
-                  <label className="input-label">Schedule Date & Time</label>
+                  <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Calendar size={14} /> Schedule Date & Time</label>
                   <input 
                     type="datetime-local" 
                     className="input" 
@@ -1195,21 +1751,21 @@ const SupaAdmin = () => {
                   />
                 </div>
                 <div className="input-group">
-                  <label className="input-label">Recurring</label>
+                  <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Repeat size={14} /> Recurring</label>
                   <select 
                     className="input" 
                     value={socialForm.recurring}
                     onChange={e => setSocialForm({ ...socialForm, recurring: e.target.value })}
                   >
-                    <option value="none">None</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
+                    <option value="none">One-time Post</option>
+                    <option value="weekly">Every Week</option>
+                    <option value="monthly">Every Month</option>
                   </select>
                 </div>
               </div>
 
-              <div className="input-group">
-                <label className="input-label">Media Upload (Drag & Drop)</label>
+              <div className="input-group" style={{ marginBottom: '24px' }}>
+                <label className="input-label">Media Content</label>
                 <div 
                   className="drag-drop-zone glass"
                   onDragOver={e => e.preventDefault()}
@@ -1218,9 +1774,15 @@ const SupaAdmin = () => {
                     if (e.dataTransfer.files[0]) setSocialForm({ ...socialForm, mediaFile: e.dataTransfer.files[0] });
                   }}
                   onClick={() => document.getElementById('social-file').click()}
+                  style={{ minHeight: '120px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
                 >
-                  <ImageIcon size={32} className="text-accent" />
-                  <p>{socialForm.mediaFile ? socialForm.mediaFile.name : 'Click or Drag & Drop image/video here'}</p>
+                  <div className="upload-icon-pulse" style={{ background: 'rgba(0, 255, 170, 0.1)', width: '50px', height: '50px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <ImageIcon size={24} className="text-accent" />
+                  </div>
+                  <p style={{ margin: 0, fontSize: '14px', fontWeight: '500' }}>
+                    {socialForm.mediaFile ? socialForm.mediaFile.name : 'Click or Drag & Drop image/video here'}
+                  </p>
+                  <p style={{ margin: 0, fontSize: '11px', opacity: 0.5 }}>Supports JPG, PNG, MP4 (Max 50MB)</p>
                   <input 
                     id="social-file" 
                     type="file" 
@@ -1229,17 +1791,28 @@ const SupaAdmin = () => {
                     onChange={e => setSocialForm({ ...socialForm, mediaFile: e.target.files[0] })} 
                   />
                 </div>
+                
                 {socialForm.mediaFile && (
-                  <div className="upload-preview-strip animate-fade-in">
-                    <span className="file-info"><ImageIcon size={14} /> {socialForm.mediaFile.name} ({(socialForm.mediaFile.size / 1024 / 1024).toFixed(1)}MB)</span>
-                    <button type="button" className="text-danger" onClick={() => setSocialForm({ ...socialForm, mediaFile: null })}>Remove</button>
+                  <div className="media-preview-large animate-fade-in">
+                    {socialForm.mediaFile.type.startsWith('video') ? (
+                      <video src={URL.createObjectURL(socialForm.mediaFile)} controls />
+                    ) : (
+                      <img src={URL.createObjectURL(socialForm.mediaFile)} alt="Preview" />
+                    )}
+                    <button 
+                      type="button" 
+                      className="remove-media-overlay"
+                      onClick={(e) => { e.stopPropagation(); setSocialForm({ ...socialForm, mediaFile: null }); }}
+                    >
+                      <X size={16} />
+                    </button>
                   </div>
                 )}
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+              <div style={{ display: 'flex', gap: '12px' }}>
                 <button type="button" className="btn btn-secondary flex-1" onClick={() => setShowSocialModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary flex-1" disabled={socialLoading}>
+                <button type="submit" className="btn btn-primary flex-1" disabled={socialLoading || socialForm.platforms.length === 0} style={{ height: '48px', fontSize: '15px' }}>
                   {socialLoading ? 'Scheduling...' : 'Schedule Post 🚀'}
                 </button>
               </div>
