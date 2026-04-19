@@ -68,14 +68,46 @@ const SupaAdmin = () => {
   const [isLive, setIsLive] = useState(false);
   const [logsLoading, setLogsLoading] = useState(false);
 
+  // Social Media State
+  const [socialPosts, setSocialPosts] = useState([]);
+  const [socialLoading, setSocialLoading] = useState(false);
+  const [searchGymId, setSearchGymId] = useState('');
+  const [showSocialModal, setShowSocialModal] = useState(false);
+  const [socialForm, setSocialForm] = useState({
+    gymId: '', title: '', caption: '', hashtags: '', 
+    platforms: ['instagram', 'facebook', 'twitter', 'blogger'],
+    mediaFile: null, status: 'SCHEDULED', scheduledAt: ''
+  });
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  const fetchSocialPosts = useCallback(async (gId) => {
+    if (!gId) return;
+    try {
+      setSocialLoading(true);
+      const res = await fetch(`/api/supaadmin/posts?gymId=${gId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSocialPosts(data.posts);
+      }
+    } catch (err) { console.error(err); } finally { setSocialLoading(false); }
+  }, [token]);
   const fetchLogStats = useCallback(async () => {
     try {
       const res = await fetch('/api/supaadmin/log-stats', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (res.ok) setLogStats(await res.json());
-    } catch (err) { console.error(err); }
+      if (res.ok) {
+        const data = await res.json();
+        setLogStats(data);
+      }
+    } catch (err) {
+      console.error('Log Stats Error:', err);
+    }
   }, [token]);
+
+
 
   const fetchLogs = useCallback(async () => {
     try {
@@ -97,7 +129,21 @@ const SupaAdmin = () => {
     } catch (err) { console.error(err); } finally { setLogsLoading(false); }
   }, [token, logFilters]);
 
+  const fetchClients = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/supaadmin/clients', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setClients(data);
+      }
+    } catch (err) { console.error(err); } finally { setLoading(false); }
+  }, [token]);
+
   const fetchRevenue = useCallback(async () => {
+
     try {
       const res = await fetch('/api/supaadmin/revenue', {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -115,17 +161,164 @@ const SupaAdmin = () => {
     } catch (err) { console.error(err); }
   }, [token]);
 
-  const fetchClients = useCallback(async () => {
+  const handleAddSocialPost = async (e) => {
+    e.preventDefault();
     try {
-      const res = await fetch('/api/supaadmin/clients', {
+      setSocialLoading(true);
+      const formData = new FormData();
+      formData.append('gymId', socialForm.gymId);
+      formData.append('title', socialForm.title);
+      formData.append('caption', socialForm.caption);
+      formData.append('hashtags', socialForm.hashtags);
+      formData.append('platforms', JSON.stringify(socialForm.platforms));
+      formData.append('scheduledAt', socialForm.scheduledAt);
+      if (socialForm.mediaFile) formData.append('media', socialForm.mediaFile);
+
+      const res = await fetch('/api/supaadmin/posts', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+
+      if (res.ok) {
+        setShowSocialModal(false);
+        setSocialForm({
+          gymId: socialForm.gymId, // keep gymId for convenience
+          title: '', caption: '', hashtags: '', 
+          platforms: ['instagram', 'facebook', 'twitter', 'blogger'],
+          mediaFile: null, status: 'SCHEDULED', scheduledAt: ''
+        });
+        fetchSocialPosts(socialForm.gymId);
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to schedule post');
+      }
+    } catch (err) { console.error(err); } finally { setSocialLoading(false); }
+  };
+
+  const handleDeleteSocialPost = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this scheduled post?')) return;
+    try {
+      const res = await fetch(`/api/supaadmin/posts/${id}`, {
+        method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      const data = await res.json();
-      setClients(data);
-    } catch (err) { console.error(err); } finally {
-      setLoading(false);
-    }
-  }, [token]);
+      if (res.ok) fetchSocialPosts(searchGymId);
+    } catch (err) { console.error(err); }
+  };
+
+  const handleRetryPost = async (id) => {
+    try {
+      const res = await fetch(`/api/supaadmin/posts/${id}/retry`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) fetchSocialPosts(searchGymId);
+    } catch (err) { console.error(err); }
+  };
+
+  const renderSocialMedia = () => {
+    return (
+      <div className="supa-content animate-fade-in">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <div>
+            <h2 style={{ fontSize: '24px', fontWeight: '700', margin: 0 }}>Social Media Scheduler</h2>
+            <p className="text-secondary">Manage and schedule posts across all franchises</p>
+          </div>
+          <button className="btn btn-primary" onClick={() => {
+            setSocialForm(prev => ({ ...prev, gymId: searchGymId }));
+            setShowSocialModal(true);
+          }}>
+            <Plus size={20} /> Add New Post
+          </button>
+        </div>
+
+        <div className="glass-card" style={{ padding: '20px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <div className="search-box flex-1" style={{ maxWidth: '500px' }}>
+              <Search size={18} />
+              <input 
+                type="text" 
+                placeholder="Enter Gym ID / UUID to manage posts..." 
+                value={searchGymId}
+                onChange={e => setSearchGymId(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && fetchSocialPosts(searchGymId)}
+              />
+            </div>
+            <button className="btn btn-secondary" onClick={() => fetchSocialPosts(searchGymId)}>
+              Search Posts
+            </button>
+          </div>
+        </div>
+
+        <div className="glass-card" style={{ overflow: 'hidden' }}>
+          <table className="supa-table">
+            <thead>
+              <tr>
+                <th>Sr No</th>
+                <th>Gym ID</th>
+                <th>Title</th>
+                <th>Caption</th>
+                <th>File Name</th>
+                <th>Media Type</th>
+                <th>Status</th>
+                <th>Preview</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {socialLoading ? (
+                <tr><td colSpan="9" style={{ textAlign: 'center', padding: '40px' }}>Loading posts...</td></tr>
+              ) : socialPosts.length === 0 ? (
+                <tr><td colSpan="9" style={{ textAlign: 'center', padding: '40px' }}>No posts found. Search for a Gym ID to see their scheduled content.</td></tr>
+              ) : (
+                socialPosts.map((post, index) => (
+                  <tr key={post.id}>
+                    <td>{index + 1}</td>
+                    <td style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{post.gymId}</td>
+                    <td style={{ fontWeight: 600 }}>{post.title}</td>
+                    <td><div className="truncate-text" style={{ maxWidth: '150px' }}>{post.caption}</div></td>
+                    <td>{post.fileName}</td>
+                    <td>
+                      <span className="badge badge-secondary">{post.mediaType}</span>
+                    </td>
+                    <td>
+                      <span className={`badge badge-${post.status.toLowerCase()}`}>
+                        {post.status}
+                      </span>
+                    </td>
+                    <td>
+                      {post.mediaUrl && (
+                        <div className="post-preview-thumb" onClick={() => setShowLogoModal(post.mediaUrl)}>
+                          {post.mediaType === 'video' ? (
+                            <div className="video-thumb-placeholder"><Activity size={16} /></div>
+                          ) : (
+                            <img src={post.mediaUrl} alt="Preview" />
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      <div className="action-group">
+                        {post.status === 'FAILED' && (
+                          <button className="icon-action text-accent" title="Retry" onClick={() => handleRetryPost(post.id)}>
+                            <TrendingUp size={16} />
+                          </button>
+                        )}
+                        <button className="icon-action text-danger" title="Delete" onClick={() => handleDeleteSocialPost(post.id)}>
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
 
   useEffect(() => {
     fetchClients();
@@ -373,6 +566,7 @@ const SupaAdmin = () => {
         {[
           { id: 'dashboard', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
           { id: 'clients', icon: <Users size={20} />, label: 'Clients' },
+          { id: 'social', icon: <Instagram size={20} />, label: 'Social Media' },
           { id: 'pricing', icon: <IndianRupee size={20} />, label: 'Pricing & Revenue' },
           { id: 'logs', icon: <ScrollText size={20} />, label: 'Logs' }
         ].map(item => (
@@ -927,11 +1121,135 @@ const SupaAdmin = () => {
         <div className="supa-scroll-area">
           {activeTab === 'dashboard' && renderDashboard()}
           {activeTab === 'clients' && renderClients()}
+          {activeTab === 'social' && renderSocialMedia()}
           {activeTab === 'pricing' && renderPricing()}
           {activeTab === 'logs' && renderLogs()}
         </div>
       </div>
+      {showSocialModal && (
+        <div className="modal-overlay">
+          <div className="modal-content glass animate-scale-in" style={{ maxWidth: '600px' }}>
+            <div className="modal-header">
+              <h3>Schedule New Post</h3>
+              <button className="close-btn" onClick={() => setShowSocialModal(false)}>×</button>
+            </div>
+            
+            <form onSubmit={handleAddSocialPost} className="supa-form">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                <div className="input-group">
+                  <label className="input-label">Gym ID / UUID</label>
+                  <input 
+                    type="text" 
+                    className="input" 
+                    placeholder="Enter Gym UUID..." 
+                    value={socialForm.gymId} 
+                    onChange={e => setSocialForm({ ...socialForm, gymId: e.target.value })} 
+                    required 
+                  />
+                </div>
+                <div className="input-group">
+                  <label className="input-label">Post Title</label>
+                  <input 
+                    type="text" 
+                    className="input" 
+                    placeholder="Campaign Title..." 
+                    value={socialForm.title} 
+                    onChange={e => setSocialForm({ ...socialForm, title: e.target.value })} 
+                    required 
+                  />
+                </div>
+              </div>
+
+              <div className="input-group">
+                <label className="input-label">Caption</label>
+                <textarea 
+                  className="input" 
+                  rows="3" 
+                  placeholder="Enter caption for the post..." 
+                  value={socialForm.caption}
+                  onChange={e => setSocialForm({ ...socialForm, caption: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="input-group">
+                <label className="input-label">Hashtags (Optional)</label>
+                <input 
+                  type="text" 
+                  className="input" 
+                  placeholder="#fitness #gym #health..." 
+                  value={socialForm.hashtags}
+                  onChange={e => setSocialForm({ ...socialForm, hashtags: e.target.value })}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                <div className="input-group">
+                  <label className="input-label">Schedule Date & Time</label>
+                  <input 
+                    type="datetime-local" 
+                    className="input" 
+                    value={socialForm.scheduledAt}
+                    onChange={e => setSocialForm({ ...socialForm, scheduledAt: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="input-group">
+                  <label className="input-label">Recurring</label>
+                  <select 
+                    className="input" 
+                    value={socialForm.recurring}
+                    onChange={e => setSocialForm({ ...socialForm, recurring: e.target.value })}
+                  >
+                    <option value="none">None</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="input-group">
+                <label className="input-label">Media Upload (Drag & Drop)</label>
+                <div 
+                  className="drag-drop-zone glass"
+                  onDragOver={e => e.preventDefault()}
+                  onDrop={e => {
+                    e.preventDefault();
+                    if (e.dataTransfer.files[0]) setSocialForm({ ...socialForm, mediaFile: e.dataTransfer.files[0] });
+                  }}
+                  onClick={() => document.getElementById('social-file').click()}
+                >
+                  <ImageIcon size={32} className="text-accent" />
+                  <p>{socialForm.mediaFile ? socialForm.mediaFile.name : 'Click or Drag & Drop image/video here'}</p>
+                  <input 
+                    id="social-file" 
+                    type="file" 
+                    hidden 
+                    accept="image/*,video/mp4" 
+                    onChange={e => setSocialForm({ ...socialForm, mediaFile: e.target.files[0] })} 
+                  />
+                </div>
+                {socialForm.mediaFile && (
+                  <div className="upload-preview-strip animate-fade-in">
+                    <span className="file-info"><ImageIcon size={14} /> {socialForm.mediaFile.name} ({(socialForm.mediaFile.size / 1024 / 1024).toFixed(1)}MB)</span>
+                    <button type="button" className="text-danger" onClick={() => setSocialForm({ ...socialForm, mediaFile: null })}>Remove</button>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button type="button" className="btn btn-secondary flex-1" onClick={() => setShowSocialModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary flex-1" disabled={socialLoading}>
+                  {socialLoading ? 'Scheduling...' : 'Schedule Post 🚀'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {showModal && (
+
         <div className="modal-overlay">
           <div className="modal-content glass-card animate-fade-in" style={{ maxWidth: '560px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
             <h3 style={{ marginBottom: '4px' }}>➕ Add New Client</h3>

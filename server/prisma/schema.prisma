@@ -15,6 +15,7 @@ model Gym {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   logoUrl       String?
+  socialTokens  Json?
   products      Product[]
   users         User[]
   scheduledPosts ScheduledPost[]

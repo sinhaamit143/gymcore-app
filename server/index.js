@@ -85,7 +85,10 @@ const seedDatabase = async () => {
       defaultGym = await prisma.gym.create({ data: { name: 'GymCore Default Gym' } });
     }
 
-    const adminExists = await prisma.user.findUnique({ where: { email: 'admin@gymcore.com' } });
+    const adminExists = await prisma.user.findUnique({ 
+      where: { email: 'admin@gymcore.com' },
+      select: { id: true, email: true, role: true }
+    });
     if (adminExists) {
       if (adminExists.role !== 'SUPER_ADMIN' && adminExists.role !== 'GYM_OWNER') {
         await prisma.user.update({
@@ -244,7 +247,10 @@ app.post('/api/auth/register', async (req, res) => {
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password, gymId } = req.body;
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({ 
+      where: { email },
+      select: { id: true, email: true, password: true, name: true, role: true, gymId: true }
+    });
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
 
     // Super Admin must strictly use /supaadmin and cannot log into gym context
@@ -271,7 +277,7 @@ app.post('/api/auth/login', async (req, res) => {
     await writeLog('INFO', 'CLIENT_LOGIN', `User ${user.name} logged in`, user.gymId, user.id, { role: user.role });
     const fullUser = await prisma.user.findUnique({
       where: { id: user.id },
-      include: { gym: true }
+      select: { id: true, email: true, name: true, role: true, gymId: true, avatar: true, phone: true, points: true, subscriptionPlan: true, subscriptionStatus: true },
     });
     const cleanUser = { ...fullUser, password: undefined };
     res.json({ token, user: cleanUser });
@@ -283,7 +289,7 @@ app.get('/api/user', authenticateToken, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({ 
       where: { id: req.user.id },
-      include: { gym: true }
+      select: { id: true, email: true, name: true, role: true, gymId: true, avatar: true, phone: true, points: true, subscriptionPlan: true, subscriptionStatus: true },
     });
     if (!user) return res.status(404).json({ error: 'User not found' });
     
@@ -499,9 +505,14 @@ app.post('/api/supaadmin/clients', authenticateToken, requireSuperAdmin, upload.
         gymId: gym.id,
         phone,
         subscriptionPlan: subscriptionPlan || 'Premium',
-        subscriptionStatus: 'Active',
-        socialTokens: formattedSocial
+        subscriptionStatus: 'Active'
       }
+    });
+
+    // Update gym with social tokens
+    await prisma.gym.update({
+      where: { id: gym.id },
+      data: { socialTokens: formattedSocial }
     });
 
     res.status(201).json({ message: 'Client created successfully', client: { ...user, password: undefined, gym } });
@@ -511,18 +522,21 @@ app.post('/api/supaadmin/clients', authenticateToken, requireSuperAdmin, upload.
 app.patch('/api/supaadmin/clients/:id/social-toggle', authenticateToken, requireSuperAdmin, async (req, res) => {
   try {
     const { platform, enabled } = req.body;
-    const user = await prisma.user.findUnique({ where: { id: req.params.id } });
-    if (!user) return res.status(404).json({ error: 'Client not found' });
+    const user = await prisma.user.findUnique({ 
+      where: { id: req.params.id },
+      include: { gym: true }
+    });
+    if (!user || !user.gym) return res.status(404).json({ error: 'Client or associated gym not found' });
 
-    const social = user.socialTokens || {};
+    const social = user.gym.socialTokens || {};
     if (social[platform]) {
       social[platform].enabled = enabled;
     } else {
       social[platform] = { token: '', enabled: enabled };
     }
 
-    await prisma.user.update({
-      where: { id: req.params.id },
+    await prisma.gym.update({
+      where: { id: user.gymId },
       data: { socialTokens: social }
     });
 
@@ -560,22 +574,6 @@ app.patch('/api/supaadmin/clients/:id', authenticateToken, requireSuperAdmin, up
 
     const logoUrl = req.file ? `/api/uploads/logos/${req.file.filename}` : undefined;
 
-    // Build structured social tokens preserving existing enabled states if no change
-    const existingUser = await prisma.user.findUnique({ where: { id: req.params.id } });
-    if (!existingUser) return res.status(404).json({ error: 'Client not found' });
-
-    let updatedSocial = existingUser.socialTokens || {};
-    if (parsedSocial) {
-      const platforms = ['instagram', 'facebook', 'twitter', 'blogger'];
-      platforms.forEach(p => {
-        const newToken = parsedSocial[p] !== undefined ? parsedSocial[p] : (updatedSocial[p]?.token || '');
-        updatedSocial[p] = {
-          token: newToken,
-          enabled: newToken ? (updatedSocial[p]?.enabled ?? true) : false
-        };
-      });
-    }
-
     // Update user fields
     const updatedUser = await prisma.user.update({
       where: { id: req.params.id },
@@ -584,19 +582,33 @@ app.patch('/api/supaadmin/clients/:id', authenticateToken, requireSuperAdmin, up
         ...(email && { email }),
         ...(phone !== undefined && { phone }),
         ...(subscriptionPlan && { subscriptionPlan }),
-        ...(subscriptionStatus && { subscriptionStatus }),
-        socialTokens: updatedSocial
+        ...(subscriptionStatus && { subscriptionStatus })
       }
     });
 
     // Update gym fields if provided
-    if (existingUser.gymId && (businessName || gymLocation !== undefined || logoUrl !== undefined)) {
+    if (existingUser.gymId) {
+      const gym = await prisma.gym.findUnique({ where: { id: existingUser.gymId } });
+      let updatedSocial = gym?.socialTokens || {};
+      
+      if (parsedSocial) {
+        const platforms = ['instagram', 'facebook', 'twitter', 'blogger'];
+        platforms.forEach(p => {
+          const newToken = parsedSocial[p] !== undefined ? parsedSocial[p] : (updatedSocial[p]?.token || '');
+          updatedSocial[p] = {
+            token: newToken,
+            enabled: newToken ? (updatedSocial[p]?.enabled ?? true) : false
+          };
+        });
+      }
+
       await prisma.gym.update({
         where: { id: existingUser.gymId },
         data: { 
           ...(businessName && { name: businessName }),
           ...(gymLocation !== undefined && { location: gymLocation }),
-          ...(logoUrl !== undefined && { logoUrl: logoUrl })
+          ...(logoUrl !== undefined && { logoUrl: logoUrl }),
+          socialTokens: updatedSocial
         }
       });
     }
@@ -918,22 +930,16 @@ app.get('/api/n8n/pending-posts', requireN8nAuth, async (req, res) => {
       },
       include: {
         gym: {
-          include: {
-            users: {
-              where: { role: 'GYM_OWNER' },
-              select: { socialTokens: true }
-            }
-          }
+          select: { socialTokens: true }
         }
       }
     });
 
     // Format for n8n: extract tokens cleanly
     const formattedPosts = posts.map(post => {
-      const owner = post.gym?.users?.[0];
       return {
         ...post,
-        socialTokens: owner?.socialTokens || {}
+        socialTokens: post.gym?.socialTokens || {}
       };
     });
 
@@ -1134,7 +1140,10 @@ app.delete('/api/community/posts/:id', authenticateToken, async (req, res) => {
     const post = await prisma.post.findUnique({ where: { id: req.params.id } });
     if (!post) return res.status(404).json({ error: 'Post not found' });
     
-    const currentUser = await prisma.user.findUnique({ where: { id: req.user.id } });
+    const currentUser = await prisma.user.findUnique({ 
+      where: { id: req.user.id },
+      select: { id: true, role: true, gymId: true }
+    });
     if (post.userId !== req.user.id && currentUser.role !== 'SUPER_ADMIN' && currentUser.role !== 'GYM_OWNER') {
       return res.status(403).json({ error: 'Unauthorized to delete this post' });
     }

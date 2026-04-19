@@ -13,6 +13,11 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('fetch', event => {
+  // Bypass SW for API calls to avoid fetch errors during server issues
+  if (event.request.url.includes('/api')) {
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then(response => {

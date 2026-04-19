@@ -143,6 +143,17 @@ const AppLayout = ({ children }) => {
 
 // --- Main App Component ---
 function App() {
+  useEffect(() => {
+    // Force unregister all service workers to resolve persistent 'Failed to fetch' issues
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        for (let registration of registrations) {
+          registration.unregister();
+        }
+      });
+    }
+  }, []);
+
   return (
     <ThemeProvider>
       <AuthProvider>
