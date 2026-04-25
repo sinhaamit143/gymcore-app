@@ -94,18 +94,32 @@ const Admin = () => {
     }
   };
 
-  const getSubscriptionValue = (plan) => {
-    const p = String(plan || '').toLowerCase();
-    if (p === 'elite') return 1500;
-    if (p === 'pro') return 1000;
-    if (p === 'basic' || p === 'premium') return 500; // Updated pricing tiers
-    return 0;
-  };
-
   // Calculate Revenue
   const totalOrderRevenue = orders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
-  const totalSubRevenue = usersList.reduce((sum, u) => sum + getSubscriptionValue(u.subscriptionPlan), 0);
+  const totalSubRevenue = usersList.reduce((sum, u) => sum + (u.totalPaid || 0), 0);
   const totalRevenue = totalOrderRevenue + totalSubRevenue;
+
+  // Helper to determine status and time left
+  const getSubDetails = (user) => {
+    if (!user.subscriptionPlan || user.subscriptionPlan.toLowerCase() === 'free') {
+      return { status: 'Free Tier', color: 'var(--text-secondary)', bg: 'rgba(255,255,255,0.05)', timeLeft: 'N/A' };
+    }
+    if (!user.subscriptionExpiry) {
+      return { status: 'Active', color: '#3b82f6', bg: 'rgba(59,130,246,0.1)', timeLeft: 'Ongoing' };
+    }
+    
+    const now = new Date();
+    const expiry = new Date(user.subscriptionExpiry);
+    const diffTime = expiry - now;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) {
+      return { status: 'Expired', color: '#ff4444', bg: 'rgba(255,68,68,0.1)', timeLeft: `Expired ${Math.abs(diffDays)}d ago` };
+    } else if (diffDays <= 7) {
+      return { status: 'Expiring Soon', color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', timeLeft: `${diffDays} days left` };
+    }
+    return { status: 'Active', color: '#10b981', bg: 'rgba(16,185,129,0.1)', timeLeft: `${diffDays} days left` };
+  };
 
   const handleDeleteUser = async (id, e) => {
     e.stopPropagation();
@@ -786,15 +800,17 @@ const Admin = () => {
                 <tr className="header-row">
                   <th>Athlete Details</th>
                   <th>Subscription</th>
-                  <th>Growth Metric</th>
-                  <th>Affiliation Date</th>
+                  <th>Status & Time Left</th>
+                  <th>Revenue Generated</th>
                   <th style={{ textAlign: 'right' }}>Controls</th>
                 </tr>
               </thead>
               <tbody>
               {filteredUsers.length === 0 ? (
                 <tr><td colSpan="5" style={{ textAlign: 'center', padding: '60px', color: 'var(--text-secondary)' }}>No personnel matched the query.</td></tr>
-              ) : filteredUsers.map(u => (
+              ) : filteredUsers.map(u => {
+                const sub = getSubDetails(u);
+                return (
                 <tr key={u.id}>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -808,24 +824,31 @@ const Admin = () => {
                   <td>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <span className="status-pill" style={{ 
-                        background: u.subscriptionPlan ? 'rgba(var(--accent-color-rgb), 0.15)' : 'rgba(255,255,255,0.05)',
-                        color: u.subscriptionPlan ? 'var(--accent-color)' : 'var(--text-secondary)',
+                        background: 'rgba(var(--accent-color-rgb), 0.15)',
+                        color: 'var(--accent-color)',
                         width: 'fit-content'
                       }}>
                         {u.subscriptionPlan || 'Free Tier'}
                       </span>
+                      {u.subscriptionDuration && (
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                          {u.subscriptionDuration}
+                        </div>
+                      )}
                     </div>
                   </td>
                   <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                       <div style={{ height: '6px', width: '60px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px' }}>
-                          <div style={{ height: '100%', width: `${Math.min(100, (u.points || 0) / 5)}%`, background: 'var(--accent-color)', borderRadius: '10px' }}></div>
-                       </div>
-                       <span style={{ fontSize: '12px', fontWeight: 'bold' }}>{u.points || 0} XP</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span className="status-pill" style={{ background: sub.bg, color: sub.color, width: 'fit-content', padding: '4px 10px', fontSize: '11px' }}>
+                        {sub.status}
+                      </span>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600' }}>
+                        {sub.timeLeft}
+                      </div>
                     </div>
                   </td>
-                  <td style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
-                    {new Date(u.createdAt).toLocaleDateString()}
+                  <td>
+                    <div style={{ fontWeight: '900', color: '#fff' }}>₹{u.totalPaid?.toLocaleString() || 0}</div>
                   </td>
                   <td style={{ textAlign: 'right' }}>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
@@ -834,7 +857,7 @@ const Admin = () => {
                     </div>
                   </td>
                 </tr>
-              ))}
+              )})}
               </tbody>
             </table>
           </div>

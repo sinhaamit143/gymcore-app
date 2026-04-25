@@ -8,8 +8,12 @@ const Pricing = () => {
   const { user, token, setUser } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  
+  // Step Management
+  const [step, setStep] = useState(1);
+  const [selectedTier, setSelectedTier] = useState(null);
 
-  const handleSubscribe = async (plan) => {
+  const handleSubscribe = async (duration) => {
     setLoading(true);
     try {
       const res = await fetch('/api/user/subscribe', {
@@ -18,7 +22,7 @@ const Pricing = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ plan })
+        body: JSON.stringify({ plan: selectedTier.id, duration })
       });
 
       if (res.ok) {
@@ -47,74 +51,126 @@ const Pricing = () => {
 
   const tiers = [
     {
-      id: 'free',
-      name: 'Free',
-      price: '0',
+      id: 'Basic',
+      name: 'Basic',
+      price: 500,
       features: ['Basic Workout Logging', 'Limited Nutrition Tracking', 'Community Access (Read-only)', 'Standard Support'],
       highlighted: false,
-      cta: 'Continue with Free'
+      cta: 'Select Basic'
     },
     {
-      id: 'pro',
+      id: 'Pro',
       name: 'Pro',
-      price: '29',
+      price: 1000,
       features: ['Unlimited Workout Logs', 'Advanced Nutrition Tracking', 'Full Community Access', 'Priority Analytics', 'Direct Coach Chat'],
       highlighted: true,
-      cta: 'Go Pro Now'
+      cta: 'Select Pro'
     },
     {
-      id: 'elite',
+      id: 'Elite',
       name: 'Elite',
-      price: '89',
+      price: 1500,
       features: ['Everything in Pro', 'Custom 1-on-1 Workout Plans', 'Personalized Meal Plans', 'VIP Event Access', 'Elite Member Badge'],
       highlighted: false,
-      cta: 'Unlock Elite Access'
+      cta: 'Select Elite'
     }
+  ];
+
+  const durations = [
+    { id: '1 Month', name: 'Monthly', months: 1, discount: 0 },
+    { id: '3 Months', name: 'Quarterly', months: 3, discount: 0.05 },
+    { id: '6 Months', name: 'Half-Yearly', months: 6, discount: 0.10 },
+    { id: '1 Year', name: 'Yearly', months: 12, discount: 0.20 }
   ];
 
   return (
     <div className="page pricing-page animate-fade-in">
       <header className="pricing-header">
         <h1>Transform Your Journey</h1>
-        <p className="text-secondary text-lg">Choose the perfect plan to fuel your fitness goals.</p>
+        <p className="text-secondary text-lg">
+          {step === 1 ? 'Step 1: Choose the perfect plan to fuel your fitness goals.' : `Step 2: Choose your commitment for ${selectedTier?.name}.`}
+        </p>
       </header>
 
-      <div className="tier-container">
-        {tiers.map((tier) => (
-          <div key={tier.id} className={`glass-card tier-card ${tier.highlighted ? 'featured' : ''}`}>
-            {tier.highlighted && <div className="featured-badge">MOST POPULAR</div>}
-            
-            <div className="tier-header">
-              <div className="tier-name">{tier.name}</div>
-              <div className="tier-price">₹{tier.price}<span>/mo</span></div>
-            </div>
+      {step === 1 && (
+        <div className="tier-container">
+          {tiers.map((tier) => (
+            <div key={tier.id} className={`glass-card tier-card ${tier.highlighted ? 'featured' : ''}`}>
+              {tier.highlighted && <div className="featured-badge">MOST POPULAR</div>}
+              
+              <div className="tier-header">
+                <div className="tier-name">{tier.name}</div>
+                <div className="tier-price">₹{tier.price}<span>/mo</span></div>
+              </div>
 
-            <div className="tier-features">
-              <ul>
-                {tier.features.map((feature, idx) => (
-                  <li key={idx}>
-                    <Check size={18} className="icon" />
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+              <div className="tier-features">
+                <ul>
+                  {tier.features.map((feature, idx) => (
+                    <li key={idx}>
+                      <Check size={18} className="icon" />
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
-            <div className="tier-footer">
-              <button 
-                className={`btn ${tier.highlighted ? 'btn-primary' : 'btn-secondary'} btn-tier`}
-                onClick={() => handleSubscribe(tier.id)}
-                disabled={loading}
-              >
-                {loading ? 'Processing...' : tier.cta}
-              </button>
+              <div className="tier-footer">
+                <button 
+                  className={`btn ${tier.highlighted ? 'btn-primary' : 'btn-secondary'} btn-tier`}
+                  onClick={() => { setSelectedTier(tier); setStep(2); }}
+                >
+                  {tier.cta} <ArrowRight size={16} style={{ marginLeft: '8px' }}/>
+                </button>
+              </div>
             </div>
+          ))}
+        </div>
+      )}
+
+      {step === 2 && selectedTier && (
+        <div>
+          <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+             <button onClick={() => setStep(1)} className="btn btn-secondary" style={{ marginBottom: '20px' }}>&larr; Back to Plans</button>
           </div>
-        ))}
-      </div>
+          <div className="tier-container">
+            {durations.map((d) => {
+              const rawTotal = selectedTier.price * d.months;
+              const finalTotal = rawTotal - (rawTotal * d.discount);
+              const savings = rawTotal - finalTotal;
+
+              return (
+                <div key={d.id} className="glass-card tier-card" style={{ padding: '30px', textAlign: 'center' }}>
+                  <div className="tier-name" style={{ fontSize: '24px', marginBottom: '10px' }}>{d.name}</div>
+                  <div style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>{d.id} Access</div>
+                  
+                  <div className="tier-price" style={{ fontSize: '36px', marginBottom: '10px' }}>₹{finalTotal.toLocaleString()}</div>
+                  
+                  {d.discount > 0 ? (
+                     <div style={{ color: '#10b981', fontSize: '14px', fontWeight: 'bold', marginBottom: '20px', minHeight: '20px' }}>
+                       Save {d.discount * 100}% (₹{savings.toLocaleString()})
+                     </div>
+                  ) : (
+                     <div style={{ minHeight: '20px', marginBottom: '20px' }}></div>
+                  )}
+
+                  <div className="tier-footer">
+                    <button 
+                      className="btn btn-primary btn-tier"
+                      onClick={() => handleSubscribe(d.id)}
+                      disabled={loading}
+                    >
+                      {loading ? 'Processing...' : 'Confirm Subscription'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="mt-8 text-center">
-        <p className="text-secondary text-sm">All plans include our core fitness tracking capabilities. Cancel anytime.</p>
+        <p className="text-secondary text-sm">All plans include our core fitness tracking capabilities. Secure checkout powered by GymCore.</p>
       </div>
     </div>
   );

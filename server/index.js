@@ -345,19 +345,50 @@ app.put('/api/user', authenticateToken, async (req, res) => {
 
 app.put('/api/user/subscribe', authenticateToken, async (req, res) => {
   try {
-    const { plan } = req.body;
-    if (!['free', 'pro', 'elite'].includes(plan)) {
-      return res.status(400).json({ error: 'Invalid subscription plan' });
-    }
+    const { plan, duration } = req.body;
     
+    // Normalize tier inputs
+    const validTiers = ['Basic', 'Pro', 'Elite'];
+    const selectedTier = validTiers.find(t => t.toLowerCase() === (plan || '').toLowerCase());
+    
+    if (!selectedTier) {
+      return res.status(400).json({ error: 'Invalid subscription tier' });
+    }
+
+    // Default to 1 Month if not provided (for backwards compatibility if needed)
+    const subDuration = duration || '1 Month';
+    let monthsToAdd = 1;
+    let discount = 0;
+
+    if (subDuration === '3 Months') { monthsToAdd = 3; discount = 0.05; }
+    else if (subDuration === '6 Months') { monthsToAdd = 6; discount = 0.10; }
+    else if (subDuration === '1 Year') { monthsToAdd = 12; discount = 0.20; }
+
+    // Calculate Price
+    const basePrices = { 'Basic': 500, 'Pro': 1000, 'Elite': 1500 };
+    const baseMonthlyPrice = basePrices[selectedTier];
+    const rawTotal = baseMonthlyPrice * monthsToAdd;
+    const finalTotal = rawTotal - (rawTotal * discount);
+
+    // Calculate Expiry
+    const expiryDate = new Date();
+    expiryDate.setMonth(expiryDate.getMonth() + monthsToAdd);
+
     await prisma.user.update({
       where: { id: req.user.id },
-      data: { subscriptionPlan: plan }
+      data: { 
+        subscriptionPlan: selectedTier,
+        subscriptionDuration: subDuration,
+        subscriptionExpiry: expiryDate,
+        totalPaid: finalTotal,
+        subscriptionStatus: 'Active'
+      }
     });
     
-    res.json({ message: `Successfully subscribed to ${plan} plan!` });
+    res.json({ message: `Successfully subscribed to ${selectedTier} plan for ${subDuration}!` });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
 
 app.get('/api/user/plans', authenticateToken, async (req, res) => {
   try {
@@ -1230,7 +1261,11 @@ app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) =>
   try {
     const users = await prisma.user.findMany({
       where: { gymId: req.fullUser.gymId },
-      select: { id: true, name: true, email: true, role: true, avatar: true, createdAt: true },
+      select: { 
+        id: true, name: true, email: true, role: true, avatar: true, createdAt: true,
+        subscriptionPlan: true, subscriptionStatus: true, subscriptionExpiry: true, 
+        subscriptionDuration: true, totalPaid: true 
+      },
       orderBy: { createdAt: 'desc' }
     });
     res.json(users);
