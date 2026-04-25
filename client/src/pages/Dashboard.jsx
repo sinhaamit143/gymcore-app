@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../App';
-import { Flame, Dumbbell, Apple, Plus, Calendar, X, Target, Edit2, Search } from 'lucide-react';
+import { Flame, Dumbbell, Apple, Plus, Calendar, X, Target, Edit2, Search, Bell } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import './Dashboard.css';
 
@@ -9,6 +9,7 @@ const Dashboard = () => {
   const [workouts, setWorkouts] = useState([]);
   const [nutrition, setNutrition] = useState([]);
   const [plans, setPlans] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showWorkoutModal, setShowWorkoutModal] = useState(false);
   const [showNutritionModal, setShowNutritionModal] = useState(false);
@@ -51,19 +52,22 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [workRes, nutrRes, plansRes] = await Promise.all([
+        const [workRes, nutrRes, plansRes, annRes] = await Promise.all([
           fetch('/api/workouts', { headers: { 'Authorization': `Bearer ${token}` } }),
           fetch('/api/nutrition', { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch('/api/user/plans', { headers: { 'Authorization': `Bearer ${token}` } })
+          fetch('/api/user/plans', { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch('/api/announcements', { headers: { 'Authorization': `Bearer ${token}` } })
         ]);
         
         const workData = await workRes.json();
         const nutrData = await nutrRes.json();
         const plansData = await plansRes.json();
+        const annData = annRes.ok ? await annRes.json() : [];
         
         setWorkouts(workData);
         setNutrition(nutrData);
         setPlans(plansData);
+        setAnnouncements(annData);
       } catch (err) {
         console.error(err);
       } finally {
@@ -200,18 +204,34 @@ const Dashboard = () => {
       )}
 
       {user?.targetWeight && (
-        <div className="glass-card mb-4">
-          <div className="flex-between mb-2">
-            <div>
-              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Target size={18} className="text-accent" /> Weight Goal</h3>
-              <p className="text-secondary" style={{ fontSize: '14px' }}>{user.currentWeight} lbs → {user.targetWeight} lbs</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '20px' }}>
+          <div className="glass-card">
+            <div className="flex-between mb-2">
+              <div>
+                <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Target size={18} className="text-accent" /> Weight Goal</h3>
+                <p className="text-secondary" style={{ fontSize: '14px' }}>{user.currentWeight} lbs → {user.targetWeight} lbs</p>
+              </div>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowWeightModal(true)}>
+                <Edit2 size={14} /> Update
+              </button>
             </div>
-            <button className="btn btn-secondary btn-sm" onClick={() => setShowWeightModal(true)}>
-              <Edit2 size={14} /> Update
-            </button>
+            <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', marginTop: '12px' }}>
+               <div style={{ width: `${progressPercent}%`, height: '100%', background: 'var(--accent-color)', transition: 'width 1s ease-in-out' }}></div>
+            </div>
           </div>
-          <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', marginTop: '12px' }}>
-             <div style={{ width: `${progressPercent}%`, height: '100%', background: 'var(--accent-color)', transition: 'width 1s ease-in-out' }}></div>
+
+          <div className="glass-card">
+            <h3 className="mb-3" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Bell size={18} className="text-accent" /> Gym Notice Board</h3>
+            <div style={{ maxHeight: '120px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {announcements.length === 0 ? (
+                <p className="text-secondary" style={{ fontSize: '12px', textAlign: 'center', padding: '10px' }}>No active notices from your gym.</p>
+              ) : announcements.map(ann => (
+                <div key={ann.id} style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '8px', borderLeft: '3px solid var(--accent-color)' }}>
+                   <div style={{ fontSize: '13px', fontWeight: 'bold' }}>{ann.title}</div>
+                   <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>{ann.body}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -347,7 +367,7 @@ const Dashboard = () => {
             <h2 className="mb-4">Log Current Weight</h2>
             <form onSubmit={handleWeightSubmit}>
               <div className="input-group mb-4">
-                <label className="input-label">Weight (lbs)</label>
+                <label className="input-label">Weight (kg)</label>
                 <input type="number" className="input" required value={weightForm.current} onChange={e => setWeightForm({ current: e.target.value })} placeholder={user?.currentWeight} />
               </div>
               <button type="submit" className="btn btn-primary btn-full mt-2">Update Weight</button>

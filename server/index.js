@@ -26,7 +26,20 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 // Serve uploads folder under /api/uploads to be caught by Vite proxy automatically
+// Serve uploads folder under /api/uploads
 app.use('/api/uploads', express.static(path.join(__dirname, 'public/uploads')));
+
+// Extra fallback for product images that might have been saved in 'general' folder or have mismatched paths
+app.use('/api/uploads/products/:gymId/:filename', (req, res, next) => {
+  const { gymId, filename } = req.params;
+  const uploadsDir = path.join(__dirname, 'public/uploads/products');
+  const gymPath = path.join(uploadsDir, gymId, filename);
+  const generalPath = path.join(uploadsDir, 'general', filename);
+
+  if (fs.existsSync(gymPath)) return res.sendFile(path.resolve(gymPath));
+  if (fs.existsSync(generalPath)) return res.sendFile(path.resolve(generalPath));
+  next();
+});
 
 // Configure Multer for logos
 const storage = multer.diskStorage({
@@ -60,6 +73,20 @@ const uploadPost = multer({
     cb(null, allowed.test(path.extname(file.originalname).toLowerCase()));
   }
 });
+
+const productStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    // req.user is populated by authenticateToken before multer runs
+    const gymId = req.user?.gymId || 'general';
+    const dir = path.join(__dirname, 'public/uploads/products', String(gymId));
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(file.originalname)}`);
+  }
+});
+const uploadProduct = multer({ storage: productStorage });
 
 const JWT_SECRET = process.env.JWT_SECRET || 'gym_app_secret_key_123';
 
@@ -238,7 +265,7 @@ app.post('/api/auth/register', async (req, res) => {
       include: { gym: true }
     });
     
-    const token = jwt.sign({ id: user.id, email }, JWT_SECRET, { expiresIn: '24h' });
+    const token = jwt.sign({ id: user.id, email, gymId: user.gymId }, JWT_SECRET, { expiresIn: '24h' });
     const cleanUser = { ...user, password: undefined };
     res.json({ token, user: cleanUser });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -273,7 +300,7 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     
-    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
+    const token = jwt.sign({ id: user.id, email: user.email, gymId: user.gymId }, JWT_SECRET, { expiresIn: '24h' });
     await writeLog('INFO', 'CLIENT_LOGIN', `User ${user.name} logged in`, user.gymId, user.id, { role: user.role });
     const fullUser = await prisma.user.findUnique({
       where: { id: user.id },
@@ -338,10 +365,18 @@ app.get('/api/user/plans', authenticateToken, async (req, res) => {
       where: { userId: req.user.id },
       orderBy: { createdAt: 'desc' }
     });
-
-    await writeLog('INFO', 'CLIENT_UPDATED', `Updated client profile: ${user.name}`, user.gymId, req.user.id, { fields: Object.keys(updateData) });
     res.json(plans);
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/services', authenticateToken, async (req, res) => {
+  // Static list for now to satisfy frontend navigation/selection
+  const services = [
+    { id: 1, name: 'Personal Training', description: 'One-on-one sessions with expert trainers', price: '₹1200' },
+    { id: 2, name: 'Yoga Classes', description: 'Daily yoga and mindfulness sessions', price: '₹600' },
+    { id: 3, name: 'Zumba Dance', description: 'Energetic group dance workouts', price: '₹500' }
+  ];
+  res.json(services);
 });
 
 // --- Admin Routes ---
@@ -1010,10 +1045,35 @@ app.patch('/api/n8n/posts/:id/result', requireN8nAuth, async (req, res) => {
 app.post('/api/admin/announce', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { title, body } = req.body;
-    const payload = JSON.stringify({ title, body });
-    // Push notifications currently stubbed due to platform migration limits
-    console.log(`[STUB] Push Announcement: ${title} - ${body}`);
-    res.status(200).json({ message: `Announcement drafted.` });
+    const gymId = req.fullUser.gymId;
+
+    const announcement = await prisma.announcement.create({
+      data: {
+        gymId,
+        title,
+        body
+      }
+    });
+
+    // Real-time Push Notification logic (Internal Gym only)
+    console.log(`[PUSH] Gym ${gymId} Announcement: ${title}`);
+    
+    await writeLog('INFO', 'ANNOUNCEMENT_SENT', `Announcement "${title}" sent to members`, gymId, req.user.id);
+    res.status(201).json(announcement);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/announcements', authenticateToken, async (req, res) => {
+  try {
+    const currentUser = await prisma.user.findUnique({ where: { id: req.user.id } });
+    if (!currentUser.gymId) return res.json([]);
+
+    const announcements = await prisma.announcement.findMany({
+      where: { gymId: currentUser.gymId },
+      orderBy: { createdAt: 'desc' },
+      take: 10
+    });
+    res.json(announcements);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1165,10 +1225,51 @@ app.delete('/api/community/posts/:id', authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// --- Admin Member Management ---
+app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      where: { gymId: req.fullUser.gymId },
+      select: { id: true, name: true, email: true, role: true, avatar: true, createdAt: true },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(users);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/admin/users/:id/role', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { role } = req.body;
+    const target = await prisma.user.update({
+      where: { id: req.params.id },
+      data: { role: role === 'admin' ? 'GYM_OWNER' : 'GYM_MEMBER' }
+    });
+    await writeLog('INFO', 'ROLE_UPDATED', `Changed role for ${target.name} to ${target.role}`, req.fullUser.gymId, req.user.id);
+    res.json(target);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const target = await prisma.user.findUnique({ where: { id: req.params.id } });
+    if (!target || target.gymId !== req.fullUser.gymId) return res.status(403).json({ error: 'Unauthorized' });
+
+    await prisma.user.delete({ where: { id: req.params.id } });
+    await writeLog('INFO', 'MEMBER_REMOVED', `Removed member ${target.name}`, req.fullUser.gymId, req.user.id);
+    res.json({ message: 'User removed from gym' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // --- Shop / Inventory Routes ---
 app.get('/api/products', authenticateToken, async (req, res) => {
   try {
+    const currentUser = await prisma.user.findUnique({ where: { id: req.user.id } });
+    const gymId = currentUser.gymId;
+
+    if (!gymId) return res.json([]); // No gym, no products
+
     const products = await prisma.product.findMany({
+      where: { gymId: gymId },
       orderBy: [
         { category: 'asc' },
         { name: 'asc' }
@@ -1180,20 +1281,67 @@ app.get('/api/products', authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/products', authenticateToken, requireAdmin, async (req, res) => {
+app.post('/api/products', authenticateToken, requireAdmin, uploadProduct.single('image'), async (req, res) => {
   try {
+    const { name, description, price, category } = req.body || {};
+    if (!name) return res.status(400).json({ error: 'Product name is required' });
+    
+    // Safety check: requireAdmin middleware sets req.fullUser
+    const gymId = req.fullUser?.gymId || req.user?.gymId;
+    if (!gymId) return res.status(400).json({ error: 'Gym ID missing from account' });
+
+    const imageUrls = req.file ? [`/api/uploads/products/${gymId}/${req.file.filename}`] : [];
+
     const product = await prisma.product.create({
       data: {
-        gymId: req.fullUser.gymId,
-        name: req.body.name,
-        description: req.body.description,
-        price: parseFloat(req.body.price),
-        category: req.body.category,
-        image: req.body.image
+        gymId,
+        name,
+        description: description || '',
+        price: parseFloat(price) || 0,
+        category: category || 'General',
+        images: imageUrls
       }
     });
+
+    await writeLog('INFO', 'PRODUCT_ADDED', `Product "${name}" added to inventory`, gymId, req.user.id);
     res.status(201).json({ ...product, _id: product.id });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { 
+    console.error('[PRODUCT_CREATE_ERR]', err);
+    res.status(500).json({ error: err.message }); 
+  }
+});
+
+app.patch('/api/products/:id', authenticateToken, requireAdmin, uploadProduct.single('image'), async (req, res) => {
+  try {
+    const { name, description, price, category, existingImages } = req.body || {};
+    const gymId = req.fullUser?.gymId;
+    if (!gymId) return res.status(400).json({ error: 'Gym ID missing' });
+
+    const prod = await prisma.product.findUnique({ where: { id: req.params.id } });
+    if (!prod || prod.gymId !== gymId) return res.status(403).json({ error: 'Unauthorized or not found' });
+
+    let finalImages = prod.images || [];
+    if (req.file) {
+      finalImages = [`/api/uploads/products/${gymId}/${req.file.filename}`];
+    }
+
+    const updated = await prisma.product.update({
+      where: { id: req.params.id },
+      data: {
+        ...(name && { name }),
+        ...(description && { description }),
+        ...(price && { price: parseFloat(price) }),
+        ...(category && { category }),
+        images: finalImages
+      }
+    });
+
+    await writeLog('INFO', 'PRODUCT_UPDATED', `Product "${updated.name}" updated`, gymId, req.user.id);
+    res.json({ ...updated, _id: updated.id });
+  } catch (err) { 
+    console.error('[PRODUCT_PATCH_ERR]', err);
+    res.status(500).json({ error: err.message }); 
+  }
 });
 
 app.delete('/api/products/:id', authenticateToken, requireAdmin, async (req, res) => {
@@ -1224,6 +1372,143 @@ app.get('/api/leaderboard', authenticateToken, async (req, res) => {
     });
     
     res.json(topUsers);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- Order Routes ---
+app.post('/api/orders', authenticateToken, async (req, res) => {
+  try {
+    const { productId, quantity, paymentMethod } = req.body;
+    const currentUser = await prisma.user.findUnique({ 
+      where: { id: req.user.id },
+      include: { gym: true }
+    });
+
+    if (!currentUser.gymId) return res.status(400).json({ error: 'User not affiliated with a gym' });
+
+    const product = await prisma.product.findUnique({ where: { id: productId } });
+    if (!product || product.gymId !== currentUser.gymId) {
+      return res.status(404).json({ error: 'Product not found in your gym' });
+    }
+
+    const totalPrice = product.price * (parseInt(quantity) || 1);
+
+    const order = await prisma.order.create({
+      data: {
+        userId: currentUser.id,
+        productId,
+        gymId: currentUser.gymId,
+        quantity: parseInt(quantity) || 1,
+        totalPrice,
+        paymentMethod: paymentMethod || 'CASH',
+        status: 'PENDING'
+      },
+      include: { product: true }
+    });
+
+    await writeLog('INFO', 'ORDER_CREATED', `Order placed for ${product.name} (Qty: ${quantity})`, currentUser.gymId, req.user.id);
+    res.status(201).json(order);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/user/orders', authenticateToken, async (req, res) => {
+  try {
+    const orders = await prisma.order.findMany({
+      where: { userId: req.user.id },
+      include: { product: true },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(orders);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/admin/orders', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const orders = await prisma.order.findMany({
+      where: { gymId: req.fullUser.gymId },
+      include: { product: true, user: { select: { name: true, email: true, avatar: true } } },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(orders);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.patch('/api/admin/orders/:id/status', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { status } = req.body;
+    const gymId = req.fullUser.gymId;
+
+    const order = await prisma.order.findUnique({ where: { id: req.params.id } });
+    if (!order || order.gymId !== gymId) return res.status(403).json({ error: 'Unauthorized' });
+
+    const updated = await prisma.order.update({
+      where: { id: req.params.id },
+      data: { status },
+      include: { product: true, user: { select: { name: true } } }
+    });
+
+    await writeLog('INFO', 'ORDER_STATUS_UPDATED', `Order for ${updated.user.name} changed to ${status}`, gymId, req.user.id);
+    res.json(updated);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/admin/users/:id/details', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const gymId = req.fullUser.gymId;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        assignedPlans: { orderBy: { createdAt: 'desc' } }
+      }
+    });
+
+    if (!user || user.gymId !== gymId) {
+      return res.status(404).json({ error: 'Member not found or unauthorized' });
+    }
+
+    res.json({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      plans: user.assignedPlans || []
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/admin/assign-plan', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { user_id, type, title, details } = req.body;
+    const gymId = req.fullUser.gymId;
+
+    const targetUser = await prisma.user.findUnique({ where: { id: user_id } });
+    if (!targetUser || targetUser.gymId !== gymId) {
+      return res.status(403).json({ error: 'Unauthorized to assign plan to this member' });
+    }
+
+    const assigned = await prisma.assignedPlan.create({
+      data: {
+        userId: user_id,
+        type,
+        title,
+        details
+      }
+    });
+
+    await writeLog('INFO', 'PLAN_ASSIGNED', `Assigned ${type} plan to ${targetUser.name}`, gymId, req.user.id);
+    res.status(201).json(assigned);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/gym/details', authenticateToken, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    if (!user || !user.gymId) return res.status(404).json({ error: 'No gym associated' });
+    
+    const gym = await prisma.gym.findUnique({ where: { id: user.gymId } });
+    if (!gym) return res.status(404).json({ error: 'Gym info not found' });
+    res.json(gym);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

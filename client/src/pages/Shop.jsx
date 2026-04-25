@@ -5,9 +5,14 @@ import './Shop.css';
 
 const categories = ['All', 'Supplements', 'Gym Wear', 'Accessories', 'Equipments'];
 
+const BACKEND_URL = 'http://localhost:5000';
+
 const ImageCarousel = ({ images, name, category }) => {
   const [currentIdx, setCurrentIdx] = useState(0);
-  const displayImages = images && images.length > 0 ? images : ['https://via.placeholder.com/400x400?text=No+Image'];
+  
+  const displayImages = images && images.length > 0 
+    ? images.map(img => img.startsWith('http') ? img : `${BACKEND_URL}${img}`)
+    : ['https://placehold.co/400x400/161b22/444/?text=No+Image'];
 
   const next = (e) => {
     e.stopPropagation();
@@ -72,8 +77,31 @@ const Shop = () => {
     return matchesCategory && matchesSearch;
   });
 
-  const handleBuy = (product) => {
-    alert(`Order placed for ${product.name}! This is a mock purchase for the GymCore prototype.`);
+  const handleBuy = async (product) => {
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify({ 
+          productId: product.id, 
+          quantity: 1, 
+          paymentMethod: 'CASH' 
+        })
+      });
+
+      if (res.ok) {
+        alert(`Successfully ordered ${product.name}! You can track it in your profile.`);
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to place order.');
+      }
+    } catch (err) {
+      console.error('Order error:', err);
+      alert('Network error while placing order.');
+    }
   };
 
   return (
@@ -130,7 +158,7 @@ const Shop = () => {
                   <h3 className="product-name">{product.name}</h3>
                   <p className="product-description">{product.description}</p>
                   <div className="product-footer">
-                    <span className="product-price">${product.price.toFixed(2)}</span>
+                    <span className="product-price">₹{product.price.toFixed(2)}</span>
                     <button className="btn btn-primary btn-buy" onClick={() => handleBuy(product)}>
                       Add to Cart
                     </button>

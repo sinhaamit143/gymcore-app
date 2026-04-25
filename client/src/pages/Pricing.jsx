@@ -86,7 +86,7 @@ const Pricing = () => {
             
             <div className="tier-header">
               <div className="tier-name">{tier.name}</div>
-              <div className="tier-price">${tier.price}<span>/mo</span></div>
+              <div className="tier-price">₹{tier.price}<span>/mo</span></div>
             </div>
 
             <div className="tier-features">

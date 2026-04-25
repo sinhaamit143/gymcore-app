@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../App';
-import { LogOut, Settings, Award, CheckCircle, ShieldAlert, Bell } from 'lucide-react';
+import { LogOut, Settings, Award, CheckCircle, ShieldAlert, Bell, Package, Clock, ShoppingBag } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import './Profile.css';
 
@@ -20,6 +20,7 @@ const Profile = () => {
   const [editMode, setEditMode] = useState(false);
   const [allServices, setAllServices] = useState([]);
   const [myReels, setMyReels] = useState([]);
+  const [myOrders, setMyOrders] = useState([]);
   const [formData, setFormData] = useState({ 
     name: user?.name || '',  
     avatar: user?.avatar || '',
@@ -44,11 +45,12 @@ const Profile = () => {
   };
 
   React.useEffect(() => {
-    const fetchServicesAndReels = async () => {
+    const fetchProfileData = async () => {
       try {
-        const [servRes, postRes] = await Promise.all([
+        const [servRes, postRes, orderRes] = await Promise.all([
           fetch('/api/services', { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch('/api/community/posts', { headers: { 'Authorization': `Bearer ${token}` } })
+          fetch('/api/community/posts', { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch('/api/user/orders', { headers: { 'Authorization': `Bearer ${token}` } })
         ]);
         
         if (servRes.ok) setAllServices(await servRes.json());
@@ -56,9 +58,10 @@ const Profile = () => {
            const allPosts = await postRes.json();
            setMyReels(allPosts.filter(p => p.user_id === user.id && p.imageUrl));
         }
+        if (orderRes.ok) setMyOrders(await orderRes.json());
       } catch (err) { console.error(err); }
     };
-    if (user) fetchServicesAndReels();
+    if (user) fetchProfileData();
   }, [token, user?.purchasedServices]);
 
   const handleUpdate = async (e) => {
@@ -264,6 +267,51 @@ const Profile = () => {
              </ul>
           </div>
         )}
+      </div>
+
+      <div className="glass-card mb-4 section-settings">
+        <h3 className="mb-4" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <ShoppingBag size={18} className="text-accent" /> My Store Orders
+        </h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          {myOrders.length === 0 ? (
+            <p className="text-secondary text-center py-4" style={{ fontSize: '14px' }}>You haven't ordered any items yet.</p>
+          ) : myOrders.map(order => (
+            <div key={order.id} style={{ background: 'rgba(255,255,255,0.03)', padding: '15px', borderRadius: '15px' }}>
+              <div className="flex-between mb-2">
+                <div style={{ display: 'flex', gap: '10px' }}>
+                   <img 
+                    src={order.product?.images?.[0] || 'https://via.placeholder.com/60'} 
+                    alt="p" 
+                    style={{ width: '50px', height: '50px', borderRadius: '10px', objectFit: 'cover' }} 
+                   />
+                   <div>
+                     <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{order.product?.name}</div>
+                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Qty: {order.quantity} • ${order.totalPrice.toFixed(2)}</div>
+                   </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                   <div style={{ 
+                     fontSize: '10px', 
+                     padding: '2px 8px', 
+                     borderRadius: '10px', 
+                     fontWeight: 'bold',
+                     background: order.status === 'DELIVERED' ? 'rgba(0, 255, 170, 0.2)' : 'rgba(255,193,7,0.2)',
+                     color: order.status === 'DELIVERED' ? '#00ffaa' : '#ffc107',
+                     display: 'inline-flex',
+                     alignItems: 'center',
+                     gap: '4px'
+                   }}>
+                     {order.status === 'DELIVERED' ? <CheckCircle size={10}/> : <Clock size={10}/>} {order.status}
+                   </div>
+                   <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                     {new Date(order.createdAt).toLocaleDateString()}
+                   </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {user?.purchasedServices?.length > 0 && (
