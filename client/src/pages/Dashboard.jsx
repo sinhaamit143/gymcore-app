@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../App';
 import { Flame, Dumbbell, Apple, Plus, Calendar, X, Target, Edit2, Search, Bell } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import QRCode from 'react-qr-code';
 import './Dashboard.css';
 
 const Dashboard = () => {
@@ -159,6 +160,26 @@ const Dashboard = () => {
         <div>
           <h1 className="page-title" style={{ margin: 0, marginBottom: '4px' }}>Hello, {user?.name.split(' ')[0]} 👋</h1>
           <p className="text-secondary" style={{ margin: 0 }}>Ready to crush your goals today?</p>
+        </div>
+      </div>
+
+      <div className="glass-card mb-4" style={{ display: 'flex', alignItems: 'center', gap: '24px', padding: '24px', background: 'linear-gradient(145deg, rgba(59,130,246,0.1), rgba(0,0,0,0.3))', border: '1px solid rgba(59,130,246,0.2)' }}>
+        <div style={{ background: '#fff', padding: '10px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <QRCode value={user?.id || 'guest'} size={80} level="M" />
+        </div>
+        <div style={{ flex: 1 }}>
+          <h3 style={{ margin: '0 0 6px 0', fontSize: '20px', color: '#fff' }}>Digital Pass</h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: '0 0 12px 0' }}>Scan at the front desk for instant check-in.</p>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <span style={{ background: 'rgba(59,130,246,0.2)', color: '#3b82f6', padding: '4px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase' }}>
+              {user?.subscriptionPlan ? `${user.subscriptionPlan} Tier` : 'Free Tier'}
+            </span>
+            {user?.subscriptionDuration && (
+              <span style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', padding: '4px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: '800' }}>
+                {user.subscriptionDuration}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
