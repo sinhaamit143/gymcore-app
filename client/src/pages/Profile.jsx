@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../App';
-import { LogOut, Settings, Award, CheckCircle, ShieldAlert, Bell, Package, Clock, ShoppingBag, X } from 'lucide-react';
+import { LogOut, Settings, Award, CheckCircle, ShieldAlert, Bell, Package, Clock, ShoppingBag, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import QRCode from 'react-qr-code';
 import './Profile.css';
@@ -23,6 +23,8 @@ const Profile = () => {
   const [myReels, setMyReels] = useState([]);
   const [myOrders, setMyOrders] = useState([]);
   const [showQRModal, setShowQRModal] = useState(false);
+  const [showOrders, setShowOrders] = useState(false);
+  const [showPersonalInfo, setShowPersonalInfo] = useState(false);
   const [formData, setFormData] = useState({ 
     name: user?.name || '',  
     avatar: user?.avatar || '',
@@ -91,6 +93,7 @@ const Profile = () => {
       if ('Notification' in window) {
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
+           localStorage.setItem('pushEnabled', 'true');
            setUser({ ...user, pushSubscription: { endpoint: 'mock-endpoint' } });
            alert('Push Notifications enabled and saved to your account!');
         } else {
@@ -104,6 +107,13 @@ const Profile = () => {
       alert('Failed to subscribe to notifications.');
     }
   };
+
+  // Hydrate mock push subscription from localStorage on load
+  React.useEffect(() => {
+    if (user && localStorage.getItem('pushEnabled') === 'true' && !user.pushSubscription) {
+      setUser({ ...user, pushSubscription: { endpoint: 'mock-endpoint' } });
+    }
+  }, [user, setUser]);
 
   return (
     <div className="page profile-page">
@@ -234,71 +244,85 @@ const Profile = () => {
       })()}
 
       <div className="glass-card mb-4 section-settings">
-         <div className="flex-between mb-4">
-            <h3>Personal Information</h3>
-            <button className="btn btn-secondary btn-sm" onClick={() => setEditMode(!editMode)}>
-              {editMode ? 'Cancel' : <><Settings size={14}/> Edit</>}
-            </button>
+         <div className="flex-between cursor-pointer" onClick={() => setShowPersonalInfo(!showPersonalInfo)}>
+            <h3 style={{ margin: 0 }}>Personal Information</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <button 
+                className="btn btn-secondary btn-sm" 
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  setEditMode(!editMode); 
+                  if (!showPersonalInfo) setShowPersonalInfo(true); 
+                }}
+              >
+                {editMode ? 'Cancel' : <><Settings size={14}/> Edit</>}
+              </button>
+              {showPersonalInfo ? <ChevronUp size={20} className="text-secondary" /> : <ChevronDown size={20} className="text-secondary" />}
+            </div>
          </div>
 
-         {editMode ? (
-            <form onSubmit={handleUpdate}>
-               <div className="input-group">
-                  <label className="input-label">Full Name</label>
-                  <input type="text" className="input" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
-               </div>
-               <div className="flex-between" style={{gap: '10px'}}>
-                 <div className="input-group flex-1">
-                    <label className="input-label">Age</label>
-                    <input type="number" className="input" value={formData.age} onChange={e => setFormData({...formData, age: e.target.value})} />
-                 </div>
-                 <div className="input-group flex-1">
-                    <label className="input-label">Phone</label>
-                    <input type="text" className="input" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
-                 </div>
-               </div>
-               <div className="input-group">
-                  <label className="input-label">Bio</label>
-                  <textarea className="input" value={formData.bio} onChange={e => setFormData({...formData, bio: e.target.value})} rows="3"></textarea>
-               </div>
-               <div className="input-group">
-                  <label className="input-label">Profile Picture (Max 5MB)</label>
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    className="input" 
-                    onChange={handleImageChange}
-                    style={{ padding: '10px' }}
-                  />
-                  {formData.avatar && formData.avatar.startsWith('data:') && (
-                     <div style={{ marginTop: '8px', fontSize: '13px', color: '#00ffaa' }}>✓ New image loaded</div>
-                  )}
-               </div>
-               <button type="submit" className="btn btn-primary btn-full mt-2">Save Changes</button>
-            </form>
-         ) : (
-            <div className="info-display">
-               <div className="info-row">
-                  <span className="info-label">Name</span>
-                  <span className="info-value">{user?.name}</span>
-               </div>
-               <div className="info-row">
-                  <span className="info-label">Email</span>
-                  <span className="info-value">{user?.email}</span>
-               </div>
-               <div className="info-row">
-                  <span className="info-label">Age</span>
-                  <span className="info-value">{user?.age || 'Not provided'}</span>
-               </div>
-               <div className="info-row">
-                  <span className="info-label">Phone</span>
-                  <span className="info-value">{user?.phone || 'Not provided'}</span>
-               </div>
-               <div className="info-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
-                  <span className="info-label">Bio</span>
-                  <span className="info-value text-secondary" style={{ lineHeight: '1.5' }}>{user?.bio || 'No bio yet.'}</span>
-               </div>
-            </div>
+         {showPersonalInfo && (
+           <div style={{ marginTop: '16px' }}>
+             {editMode ? (
+                <form onSubmit={handleUpdate}>
+                   <div className="input-group">
+                      <label className="input-label">Full Name</label>
+                      <input type="text" className="input" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+                   </div>
+                   <div className="flex-between" style={{gap: '10px'}}>
+                     <div className="input-group flex-1">
+                        <label className="input-label">Age</label>
+                        <input type="number" className="input" value={formData.age} onChange={e => setFormData({...formData, age: e.target.value})} />
+                     </div>
+                     <div className="input-group flex-1">
+                        <label className="input-label">Phone</label>
+                        <input type="text" className="input" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                     </div>
+                   </div>
+                   <div className="input-group">
+                      <label className="input-label">Bio</label>
+                      <textarea className="input" value={formData.bio} onChange={e => setFormData({...formData, bio: e.target.value})} rows="3"></textarea>
+                   </div>
+                   <div className="input-group">
+                      <label className="input-label">Profile Picture (Max 5MB)</label>
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        className="input" 
+                        onChange={handleImageChange}
+                        style={{ padding: '10px' }}
+                      />
+                      {formData.avatar && formData.avatar.startsWith('data:') && (
+                         <div style={{ marginTop: '8px', fontSize: '13px', color: '#00ffaa' }}>✓ New image loaded</div>
+                      )}
+                   </div>
+                   <button type="submit" className="btn btn-primary btn-full mt-2">Save Changes</button>
+                </form>
+             ) : (
+                <div className="info-display">
+                   <div className="info-row">
+                      <span className="info-label">Name</span>
+                      <span className="info-value">{user?.name}</span>
+                   </div>
+                   <div className="info-row">
+                      <span className="info-label">Email</span>
+                      <span className="info-value">{user?.email}</span>
+                   </div>
+                   <div className="info-row">
+                      <span className="info-label">Age</span>
+                      <span className="info-value">{user?.age || 'Not provided'}</span>
+                   </div>
+                   <div className="info-row">
+                      <span className="info-label">Phone</span>
+                      <span className="info-value">{user?.phone || 'Not provided'}</span>
+                   </div>
+                   <div className="info-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
+                      <span className="info-label">Bio</span>
+                      <span className="info-value text-secondary" style={{ lineHeight: '1.5' }}>{user?.bio || 'No bio yet.'}</span>
+                   </div>
+                </div>
+             )}
+           </div>
          )}
       </div>
 
@@ -315,89 +339,101 @@ const Profile = () => {
 
 
 
-      <div className="glass-card mb-4 section-settings">
-        <h3 className="mb-4" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <ShoppingBag size={18} className="text-accent" /> My Orders & Billing History
-        </h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-          {user?.subscriptionPlan && user?.subscriptionPlan.toLowerCase() !== 'free' && (
-            <div style={{ background: 'rgba(59,130,246,0.1)', padding: '15px', borderRadius: '15px', border: '1px solid rgba(59,130,246,0.2)' }}>
-              <div className="flex-between mb-2">
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                   <div style={{ width: '50px', height: '50px', borderRadius: '10px', background: 'rgba(59,130,246,0.2)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                     <ShieldAlert size={24} color="#3b82f6" />
-                   </div>
-                   <div>
-                     <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#fff' }}>Membership Invoice</div>
-                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{user.subscriptionPlan} Tier • {user.subscriptionDuration || 'Active'}</div>
-                   </div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                   <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#3b82f6' }}>
-                     {user.totalPaid > 0 ? `₹${user.totalPaid.toLocaleString()}` : 'Legacy Plan'}
-                   </div>
-                   <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                     {user.totalPaid > 0 ? 'Paid successfully' : 'Paid via legacy system'}
-                   </div>
-                </div>
+      {user?.subscriptionPlan && user?.subscriptionPlan.toLowerCase() !== 'free' && (
+        <div className="glass-card mb-4 section-settings">
+          <h3 className="mb-4" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <ShieldAlert size={18} className="text-accent" /> Billing History
+          </h3>
+          <div style={{ background: 'rgba(59,130,246,0.1)', padding: '15px', borderRadius: '15px', border: '1px solid rgba(59,130,246,0.2)' }}>
+            <div className="flex-between mb-2">
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                 <div style={{ width: '50px', height: '50px', borderRadius: '10px', background: 'rgba(59,130,246,0.2)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                   <ShieldAlert size={24} color="#3b82f6" />
+                 </div>
+                 <div>
+                   <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#fff' }}>Membership Invoice</div>
+                   <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{user.subscriptionPlan} Tier • {user.subscriptionDuration || 'Active'}</div>
+                 </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                 <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#3b82f6' }}>
+                   {user.totalPaid > 0 ? `₹${user.totalPaid.toLocaleString()}` : 'Legacy Plan'}
+                 </div>
+                 <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                   {user.totalPaid > 0 ? 'Paid successfully' : 'Paid via legacy system'}
+                 </div>
               </div>
             </div>
-          )}
-          {myOrders.length === 0 ? (
-            <p className="text-secondary text-center py-4" style={{ fontSize: '14px' }}>You haven't ordered any items yet.</p>
-          ) : myOrders.map(order => (
-            <div key={order.id} style={{ background: 'rgba(255,255,255,0.03)', padding: '15px', borderRadius: '15px' }}>
-              <div className="flex-between mb-2">
-                <div style={{ display: 'flex', gap: '10px' }}>
-                   <img 
-                    src={order.product?.images?.[0] || 'https://via.placeholder.com/60'} 
-                    alt="p" 
-                    style={{ width: '50px', height: '50px', borderRadius: '10px', objectFit: 'cover' }} 
-                   />
-                   <div>
-                     <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{order.product?.name}</div>
-                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Qty: {order.quantity} • ${order.totalPrice.toFixed(2)}</div>
-                     {order.status !== 'DELIVERED' && order.status !== 'CANCELLED' && (
-                        <button 
-                          onClick={async () => {
-                             if (!window.confirm('Are you sure you want to cancel this order?')) return;
-                             try {
-                               await fetch(`/api/orders/${order.id}`, {
-                                 method: 'DELETE',
-                                 headers: { 'Authorization': `Bearer ${token}` }
-                               });
-                               setMyOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'CANCELLED' } : o));
-                             } catch (err) { console.error(err); }
-                          }} 
-                          style={{ background: 'none', border: 'none', color: '#ff4d4f', fontSize: '11px', padding: 0, marginTop: '4px', cursor: 'pointer', textDecoration: 'underline' }}
-                        >
-                          Cancel Order
-                        </button>
-                     )}
-                   </div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                   <div style={{ 
-                     fontSize: '10px', 
-                     padding: '2px 8px', 
-                     borderRadius: '10px', 
-                     fontWeight: 'bold',
-                     background: order.status === 'DELIVERED' ? 'rgba(0, 255, 170, 0.2)' : order.status === 'CANCELLED' ? 'rgba(255, 77, 79, 0.2)' : 'rgba(255,193,7,0.2)',
-                     color: order.status === 'DELIVERED' ? '#00ffaa' : order.status === 'CANCELLED' ? '#ff4d4f' : '#ffc107',
-                     display: 'inline-flex',
-                     alignItems: 'center',
-                     gap: '4px'
-                   }}>
-                     {order.status === 'DELIVERED' ? <CheckCircle size={10}/> : order.status === 'CANCELLED' ? <X size={10}/> : <Clock size={10}/>} {order.status}
-                   </div>
-                   <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                     {new Date(order.createdAt).toLocaleDateString()}
-                   </div>
-                </div>
-              </div>
-            </div>
-          ))}
+          </div>
         </div>
+      )}
+
+      <div className="glass-card mb-4 section-settings">
+        <div className="flex-between cursor-pointer" onClick={() => setShowOrders(!showOrders)}>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+            <ShoppingBag size={18} className="text-accent" /> My Orders
+          </h3>
+          {showOrders ? <ChevronUp size={20} className="text-secondary" /> : <ChevronDown size={20} className="text-secondary" />}
+        </div>
+        
+        {showOrders && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '16px' }}>
+            {myOrders.length === 0 ? (
+              <p className="text-secondary text-center py-4" style={{ fontSize: '14px' }}>You haven't ordered any items yet.</p>
+            ) : myOrders.map(order => (
+              <div key={order.id} style={{ background: 'rgba(255,255,255,0.03)', padding: '15px', borderRadius: '15px' }}>
+                <div className="flex-between mb-2">
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                     <img 
+                      src={order.product?.images?.[0] || 'https://via.placeholder.com/60'} 
+                      alt="p" 
+                      style={{ width: '50px', height: '50px', borderRadius: '10px', objectFit: 'cover' }} 
+                     />
+                     <div>
+                       <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{order.product?.name}</div>
+                       <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Qty: {order.quantity} • ${order.totalPrice.toFixed(2)}</div>
+                       {order.status !== 'DELIVERED' && order.status !== 'CANCELLED' && (
+                          <button 
+                            onClick={async () => {
+                               if (!window.confirm('Are you sure you want to cancel this order?')) return;
+                               try {
+                                 await fetch(`/api/orders/${order.id}`, {
+                                   method: 'DELETE',
+                                   headers: { 'Authorization': `Bearer ${token}` }
+                                 });
+                                 setMyOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'CANCELLED' } : o));
+                               } catch (err) { console.error(err); }
+                            }} 
+                            style={{ background: 'none', border: 'none', color: '#ff4d4f', fontSize: '11px', padding: 0, marginTop: '4px', cursor: 'pointer', textDecoration: 'underline' }}
+                          >
+                            Cancel Order
+                          </button>
+                       )}
+                     </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                     <div style={{ 
+                       fontSize: '10px', 
+                       padding: '2px 8px', 
+                       borderRadius: '10px', 
+                       fontWeight: 'bold',
+                       background: order.status === 'DELIVERED' ? 'rgba(0, 255, 170, 0.2)' : order.status === 'CANCELLED' ? 'rgba(255, 77, 79, 0.2)' : 'rgba(255,193,7,0.2)',
+                       color: order.status === 'DELIVERED' ? '#00ffaa' : order.status === 'CANCELLED' ? '#ff4d4f' : '#ffc107',
+                       display: 'inline-flex',
+                       alignItems: 'center',
+                       gap: '4px'
+                     }}>
+                       {order.status === 'DELIVERED' ? <CheckCircle size={10}/> : order.status === 'CANCELLED' ? <X size={10}/> : <Clock size={10}/>} {order.status}
+                     </div>
+                     <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                       {new Date(order.createdAt).toLocaleDateString()}
+                     </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {user?.purchasedServices?.length > 0 && (

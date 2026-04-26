@@ -1,15 +1,13 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Shield, Activity, Dumbbell } from 'lucide-react';
-import { useAuth, useTheme } from '../App';
+import { Dumbbell, Bell, QrCode, Sun, Moon } from 'lucide-react';
+import { useAuth } from '../App';
 import './Header.css';
 
-const Header = () => {
+const Header = ({ setShowGlobalQR, handleOpenNotifications, unreadCount, theme, toggleTheme }) => {
   const { user } = useAuth();
   const location = useLocation();
   
-  // Don't show header on login/register page if needed, 
-  // but user said "all pages" so we'll show it everywhere or just main app.
   if (location.pathname === '/auth') return null;
 
   return (
@@ -29,6 +27,63 @@ const Header = () => {
         )}
       </Link>
 
+      <div className="header-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ position: 'relative' }}>
+          <button 
+            onClick={handleOpenNotifications} 
+            style={{ 
+              background: 'rgba(255,255,255,0.05)', 
+              border: '1px solid var(--glass-border)', 
+              color: 'var(--text-primary)', 
+              cursor: 'pointer', 
+              padding: '8px',
+              borderRadius: '50%',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center'
+            }}
+          >
+            <Bell size={18} />
+          </button>
+          {unreadCount > 0 && (
+            <span style={{ position: 'absolute', top: '-2px', right: '-2px', background: '#ff4d4f', color: '#fff', fontSize: '9px', fontWeight: 'bold', padding: '2px 5px', borderRadius: '10px', pointerEvents: 'none' }}>
+              {unreadCount}
+            </span>
+          )}
+        </div>
+        <button 
+          onClick={() => setShowGlobalQR(true)} 
+          style={{ 
+            background: 'rgba(255,255,255,0.05)', 
+            border: '1px solid var(--glass-border)', 
+            color: 'var(--text-primary)', 
+            cursor: 'pointer', 
+            padding: '8px',
+            borderRadius: '50%',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center'
+          }}
+        >
+          <QrCode size={18} />
+        </button>
+        <button 
+          onClick={toggleTheme} 
+          style={{ 
+            background: 'rgba(255,255,255,0.05)', 
+            border: '1px solid var(--glass-border)', 
+            color: 'var(--text-primary)', 
+            cursor: 'pointer', 
+            padding: '8px',
+            borderRadius: '50%',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center'
+          }}
+        >
+          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+        </button>
+      </div>
     </header>
   );
 };

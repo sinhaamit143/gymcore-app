@@ -8,6 +8,8 @@ const path = require('path');
 const webpush = require('web-push');
 const multer = require('multer');
 const fs = require('fs');
+const http = require('http');
+const { Server } = require('socket.io');
 
 const prisma = new PrismaClient();
 
@@ -29,12 +31,21 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 // Serve uploads folder under /api/uploads
 app.use('/api/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
-// Extra fallback for product images that might have been saved in 'general' folder or have mismatched paths
-app.use('/api/uploads/products/:gymId/:filename', (req, res, next) => {
+// Extra fallback for images that might have been saved in 'general' folder or have mismatched paths
+app.get('/api/uploads/products/:gymId/:filename', (req, res, next) => {
   const { gymId, filename } = req.params;
-  const uploadsDir = path.join(__dirname, 'public/uploads/products');
-  const gymPath = path.join(uploadsDir, gymId, filename);
-  const generalPath = path.join(uploadsDir, 'general', filename);
+  const gymPath = path.join(__dirname, 'public/uploads/products', gymId, filename);
+  const generalPath = path.join(__dirname, 'public/uploads/products/general', filename);
+
+  if (fs.existsSync(gymPath)) return res.sendFile(path.resolve(gymPath));
+  if (fs.existsSync(generalPath)) return res.sendFile(path.resolve(generalPath));
+  next();
+});
+
+app.get('/api/uploads/posts/:gymId/:filename', (req, res, next) => {
+  const { gymId, filename } = req.params;
+  const gymPath = path.join(__dirname, 'public/uploads/posts', gymId, filename);
+  const generalPath = path.join(__dirname, 'public/uploads/posts/general', filename);
 
   if (fs.existsSync(gymPath)) return res.sendFile(path.resolve(gymPath));
   if (fs.existsSync(generalPath)) return res.sendFile(path.resolve(generalPath));
@@ -54,10 +65,10 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// Configure Multer for post media
 const postStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const dir = `public/uploads/posts/${req.params.gymId || 'general'}`;
+    const gymId = req.user?.gymId || 'general';
+    const dir = path.join(__dirname, 'public/uploads/posts', String(gymId));
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },
@@ -304,7 +315,7 @@ app.post('/api/auth/login', async (req, res) => {
     await writeLog('INFO', 'CLIENT_LOGIN', `User ${user.name} logged in`, user.gymId, user.id, { role: user.role });
     const fullUser = await prisma.user.findUnique({
       where: { id: user.id },
-      select: { id: true, email: true, name: true, role: true, gymId: true, avatar: true, phone: true, points: true, subscriptionPlan: true, subscriptionStatus: true, subscriptionDuration: true, subscriptionExpiry: true, totalPaid: true },
+      select: { id: true, email: true, name: true, role: true, gymId: true, avatar: true, phone: true, age: true, bio: true, points: true, subscriptionPlan: true, subscriptionStatus: true, subscriptionDuration: true, subscriptionExpiry: true, totalPaid: true, currentWeight: true, targetWeight: true },
     });
     const cleanUser = { ...fullUser, password: undefined };
     res.json({ token, user: cleanUser });
@@ -316,7 +327,7 @@ app.get('/api/user', authenticateToken, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({ 
       where: { id: req.user.id },
-      select: { id: true, email: true, name: true, role: true, gymId: true, avatar: true, phone: true, points: true, subscriptionPlan: true, subscriptionStatus: true, subscriptionDuration: true, subscriptionExpiry: true, totalPaid: true },
+      select: { id: true, email: true, name: true, role: true, gymId: true, avatar: true, phone: true, age: true, bio: true, points: true, subscriptionPlan: true, subscriptionStatus: true, subscriptionDuration: true, subscriptionExpiry: true, totalPaid: true, currentWeight: true, targetWeight: true },
     });
     if (!user) return res.status(404).json({ error: 'User not found' });
     
@@ -327,11 +338,36 @@ app.get('/api/user', authenticateToken, async (req, res) => {
 
 app.put('/api/user', authenticateToken, async (req, res) => {
   try {
-    // Exclude protected fields
-    const { id, role, email, password, gymId, points, ...safeData } = req.body;
+    const { name, avatar, phone, age, bio, currentWeight, targetWeight } = req.body;
+    const safeData = {};
+    if (name !== undefined) safeData.name = name;
+    if (avatar !== undefined) safeData.avatar = avatar;
+    if (phone !== undefined) safeData.phone = phone;
+    if (age !== undefined) safeData.age = String(age);
+    if (bio !== undefined) safeData.bio = bio;
+    if (currentWeight !== undefined && !isNaN(parseFloat(currentWeight))) safeData.currentWeight = parseFloat(currentWeight);
+    if (targetWeight !== undefined && !isNaN(parseFloat(targetWeight))) safeData.targetWeight = parseFloat(targetWeight);
     
-    // Safety truncate avatar if massive string sent
-    if (safeData.avatar && safeData.avatar.length > 500) {
+    // Intercept Base64 avatars and save to disk
+    if (safeData.avatar && safeData.avatar.startsWith('data:image')) {
+      try {
+        const matches = safeData.avatar.match(/^data:image\/([A-Za-z-+\/]+);base64,(.+)$/);
+        if (matches && matches.length === 3) {
+          const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
+          const buffer = Buffer.from(matches[2], 'base64');
+          const avatarDir = path.join(__dirname, 'public', 'uploads', 'avatars');
+          if (!fs.existsSync(avatarDir)) fs.mkdirSync(avatarDir, { recursive: true });
+          
+          const filename = `${req.user.id}-${Date.now()}.${ext}`;
+          fs.writeFileSync(path.join(avatarDir, filename), buffer);
+          
+          safeData.avatar = `/api/uploads/avatars/${filename}`;
+        }
+      } catch (err) {
+        console.error('Failed to parse base64 avatar', err);
+        safeData.avatar = `https://i.pravatar.cc/150?u=${req.user.email}`;
+      }
+    } else if (safeData.avatar && safeData.avatar.length > 500) {
       safeData.avatar = `https://i.pravatar.cc/150?u=${req.user.email}`;
     }
 
@@ -1088,6 +1124,10 @@ app.post('/api/admin/announce', authenticateToken, requireAdmin, async (req, res
 
     // Real-time Push Notification logic (Internal Gym only)
     console.log(`[PUSH] Gym ${gymId} Announcement: ${title}`);
+    const io = req.app.get('io');
+    if (io) {
+      io.to(gymId).emit('new_announcement', announcement);
+    }
     
     await writeLog('INFO', 'ANNOUNCEMENT_SENT', `Announcement "${title}" sent to members`, gymId, req.user.id);
     res.status(201).json(announcement);
@@ -1208,15 +1248,22 @@ app.get('/api/community/posts', authenticateToken, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/community/posts', authenticateToken, async (req, res) => {
+app.post('/api/community/posts', authenticateToken, uploadPost.single('image'), async (req, res) => {
   try {
+    const currentUser = await prisma.user.findUnique({ where: { id: req.user.id } });
+    let imageUrl = null;
+    if (req.file) {
+      imageUrl = `/api/uploads/posts/${currentUser.gymId || 'general'}/${req.file.filename}`;
+    }
+
     const post = await prisma.post.create({
       data: {
         userId: req.user.id,
-        content: req.body.content
+        content: req.body.content || '',
+        imageUrl: imageUrl
       }
     });
-    res.json({ id: post.id, message: 'Post created!' });
+    res.json({ id: post.id, message: 'Post created!', imageUrl });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1571,4 +1618,17 @@ app.use((req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log('\n✅ Server connected! API ready on port', PORT));
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: { origin: '*' }
+});
+
+app.set('io', io);
+
+io.on('connection', (socket) => {
+  socket.on('join_gym', (gymId) => {
+    socket.join(gymId);
+  });
+});
+
+server.listen(PORT, () => console.log('\n✅ Server connected! API & Sockets ready on port', PORT));

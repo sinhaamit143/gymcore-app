@@ -30,6 +30,10 @@ model User {
   name               String
   avatar             String?        @db.VarChar(500)
   phone              String?
+  age                String?
+  bio                String?
+  currentWeight      Float?
+  targetWeight       Float?
   role               Role           @default(GYM_MEMBER)
   points             Int            @default(0)
   subscriptionPlan   String?
@@ -112,6 +116,7 @@ model Post {
   id        String   @id @default(uuid())
   content   String
   likes     Int      @default(0)
+  imageUrl  String?
   createdAt DateTime @default(now())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)

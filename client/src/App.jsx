@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { Sun, Moon, QrCode, X } from 'lucide-react';
+import { Sun, Moon, QrCode, X, Bell } from 'lucide-react';
 import QRCode from 'react-qr-code';
+import { io } from 'socket.io-client';
 import './index.css';
 
 // Lazy load pages to break circular dependencies and improve performance
@@ -106,51 +107,55 @@ const AppLayout = ({ children }) => {
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const [showGlobalQR, setShowGlobalQR] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const hideNav = location.pathname === '/login' || user?.role === 'SUPER_ADMIN' || user?.role === 'GYM_OWNER';
+
+  useEffect(() => {
+    if (user && user.gymId && !hideNav) {
+      // Fetch past announcements
+      fetch('/api/announcements', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } })
+        .then(res => res.ok ? res.json() : [])
+        .then(data => {
+           setNotifications(data);
+           // Simple unread logic based on local storage
+           const lastSeen = localStorage.getItem('lastSeenNotifications') || 0;
+           const unread = data.filter(n => new Date(n.createdAt).getTime() > lastSeen).length;
+           setUnreadCount(unread);
+        })
+        .catch(console.error);
+
+      const socket = io('/', { path: '/socket.io' });
+      socket.emit('join_gym', user.gymId);
+      
+      socket.on('new_announcement', (ann) => {
+        setNotifications(prev => [ann, ...prev]);
+        setUnreadCount(prev => prev + 1);
+        alert(`🚨 NEW GYM ANNOUNCEMENT 🚨\n\n${ann.title}\n${ann.body}`);
+      });
+
+      return () => socket.disconnect();
+    }
+  }, [user, hideNav]);
+
+  const handleOpenNotifications = () => {
+    setShowNotifications(true);
+    setUnreadCount(0);
+    localStorage.setItem('lastSeenNotifications', Date.now().toString());
+  };
 
   return (
     <div className="app-container">
       {user && !hideNav && (
         <>
-          <div style={{ position: 'fixed', top: '16px', right: '16px', zIndex: 9999, display: 'flex', gap: '8px' }}>
-            <button 
-              onClick={() => setShowGlobalQR(true)} 
-              style={{ 
-                background: 'var(--glass-bg)', 
-                backdropFilter: 'blur(10px)',
-                border: '1px solid var(--glass-border)', 
-                color: 'var(--text-primary)', 
-                cursor: 'pointer', 
-                padding: '10px',
-                borderRadius: '50%',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-              }}
-            >
-              <QrCode size={20} />
-            </button>
-            <button 
-              onClick={toggleTheme} 
-              style={{ 
-                background: 'var(--glass-bg)', 
-                backdropFilter: 'blur(10px)',
-                border: '1px solid var(--glass-border)', 
-                color: 'var(--text-primary)', 
-                cursor: 'pointer', 
-                padding: '10px',
-                borderRadius: '50%',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-              }}
-            >
-              {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
-            </button>
-          </div>
-          <Header />
+          <Header 
+            setShowGlobalQR={setShowGlobalQR} 
+            handleOpenNotifications={handleOpenNotifications} 
+            unreadCount={unreadCount} 
+            theme={theme}
+            toggleTheme={toggleTheme}
+          />
 
           {showGlobalQR && (
             <div className="modal-overlay animate-fade-in" onClick={() => setShowGlobalQR(false)}>
@@ -163,6 +168,32 @@ const AppLayout = ({ children }) => {
                 <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>
                   Present this code at the scanner to gain facility access.
                 </p>
+              </div>
+            </div>
+          )}
+
+          {showNotifications && (
+            <div className="modal-overlay animate-fade-in" onClick={() => setShowNotifications(false)}>
+              <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px', maxHeight: '80vh', overflowY: 'auto' }}>
+                <button className="modal-close" onClick={() => setShowNotifications(false)}><X size={24} /></button>
+                <h2 className="modal-title" style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Bell size={24} className="text-accent" /> Notifications
+                </h2>
+                {notifications.length === 0 ? (
+                  <p style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '20px 0' }}>You're all caught up!</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {notifications.map(n => (
+                      <div key={n.id} style={{ background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <h4 style={{ margin: '0 0 5px 0', fontSize: '15px' }}>{n.title}</h4>
+                        <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{n.body}</p>
+                        <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', marginTop: '8px' }}>
+                          {new Date(n.createdAt).toLocaleString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

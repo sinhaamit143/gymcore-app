@@ -147,7 +147,9 @@ const Dashboard = () => {
   });
 
   // Calculate Goal Progress
-  const startWeight = user?.currentWeight > user?.targetWeight ? user.currentWeight + 20 : user?.currentWeight - 20; // Mock start
+  const safeCurrentWeight = user?.currentWeight || 180;
+  const safeTargetWeight = user?.targetWeight || 160;
+  const startWeight = safeCurrentWeight > safeTargetWeight ? safeCurrentWeight + 20 : safeCurrentWeight - 20; // Mock start
   return (
     <div className="page dashboard-page">
       <div className="mb-4" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -181,13 +183,13 @@ const Dashboard = () => {
       </div>
 
       {plans.length > 0 && (
-        <div className="glass-card mb-4" style={{ border: '1px solid rgba(0,255,170,0.3)', background: 'linear-gradient(145deg, rgba(0,255,170,0.05), rgba(0,0,0,0.3))' }}>
+        <div className="glass-card mb-4" style={{ border: '1px solid rgba(0,255,170,0.3)', background: 'linear-gradient(145deg, rgba(0,255,170,0.05), var(--panel-bg))' }}>
           <h3 className="mb-3 text-accent" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Target size={18} /> Coach's Corner
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {plans.map(p => (
-              <div key={p.id} style={{ background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '12px', borderLeft: '4px solid #00ffaa' }}>
+              <div key={p.id} style={{ background: 'var(--panel-bg)', padding: '16px', borderRadius: '12px', borderLeft: '4px solid #00ffaa' }}>
                 <div className="flex-between mb-1">
                   <span style={{ fontWeight: 'bold', fontSize: '16px' }}>{p.title}</span>
                   <span style={{ fontSize: '11px', textTransform: 'uppercase', color: p.type === 'workout' ? '#ff4d4f' : '#00ffaa', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '12px' }}>{p.type} plan</span>
@@ -238,7 +240,7 @@ const Dashboard = () => {
         
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', padding: '0 20px 20px 20px' }}>
           
-          <div style={{ background: 'rgba(0,0,0,0.2)', padding: '15px', borderRadius: '12px' }}>
+          <div style={{ background: 'var(--panel-bg)', padding: '15px', borderRadius: '12px' }}>
             <div className="flex-between mb-3">
                <h4 style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>Activity & Nutrition (7 Days)</h4>
                <div style={{ display: 'flex', gap: '8px', fontSize: '10px' }}>
@@ -246,8 +248,8 @@ const Dashboard = () => {
                   <span style={{ color: '#00ffaa' }}>● Eaten</span>
                </div>
             </div>
-            <div style={{ height: '200px' }}>
-              <ResponsiveContainer width="100%" height="100%">
+            <div style={{ height: '200px', minWidth: 0 }}>
+              <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={last7Days}>
                   <XAxis dataKey="name" stroke="#8b949e" fontSize={10} tickLine={false} axisLine={false} />
                   <Tooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{ background: '#161b22', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '12px' }} />
@@ -258,18 +260,18 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div style={{ background: 'rgba(0,0,0,0.2)', padding: '15px', borderRadius: '12px' }}>
+          <div style={{ background: 'var(--panel-bg)', padding: '15px', borderRadius: '12px' }}>
             <div className="flex-between mb-3">
                <h4 style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>Weight Progression Trend</h4>
                <span style={{ fontSize: '10px', background: 'rgba(59,130,246,0.2)', color: '#3b82f6', padding: '2px 8px', borderRadius: '10px' }}>Target: {user?.targetWeight || 'N/A'}</span>
             </div>
-            <div style={{ height: '200px' }}>
-              <ResponsiveContainer width="100%" height="100%">
+            <div style={{ height: '200px', minWidth: 0 }}>
+              <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={[
                   { name: 'Start', weight: startWeight },
-                  { name: 'Wk 2', weight: startWeight - ((startWeight - (user?.currentWeight || startWeight)) * 0.3) },
-                  { name: 'Wk 4', weight: startWeight - ((startWeight - (user?.currentWeight || startWeight)) * 0.7) },
-                  { name: 'Now', weight: user?.currentWeight || startWeight }
+                  { name: 'Wk 2', weight: startWeight - ((startWeight - safeCurrentWeight) * 0.3) },
+                  { name: 'Wk 4', weight: startWeight - ((startWeight - safeCurrentWeight) * 0.7) },
+                  { name: 'Now', weight: safeCurrentWeight }
                 ]}>
                   <XAxis dataKey="name" stroke="#8b949e" fontSize={10} tickLine={false} axisLine={false} />
                   <YAxis domain={['dataMin - 5', 'dataMax + 5']} hide />

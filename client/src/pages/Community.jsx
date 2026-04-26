@@ -8,6 +8,7 @@ const Community = () => {
   const [posts, setPosts] = useState([]);
   const [newPost, setNewPost] = useState('');
   const [newImage, setNewImage] = useState(null);
+  const [newImageFile, setNewImageFile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeCommentPost, setActiveCommentPost] = useState(null);
   const [commentText, setCommentText] = useState('');
@@ -32,19 +33,23 @@ const Community = () => {
 
   const handlePostSubmit = async (e) => {
     e.preventDefault();
-    if (!newPost.trim()) return;
+    if (!newPost.trim() && !newImageFile) return;
 
     try {
+      const formData = new FormData();
+      if (newPost.trim()) formData.append('content', newPost);
+      if (newImageFile) formData.append('image', newImageFile);
+
       await fetch('/api/community/posts', {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}` 
         },
-        body: JSON.stringify({ content: newPost, imageUrl: newImage })
+        body: formData
       });
       setNewPost('');
       setNewImage(null);
+      setNewImageFile(null);
       fetchPosts();
     } catch (err) {
       console.error(err);
@@ -155,6 +160,7 @@ const Community = () => {
                   const file = e.target.files[0];
                   if (file) {
                     if (file.size > 10 * 1024 * 1024) return alert('File too large (max 10MB)');
+                    setNewImageFile(file);
                     const reader = new FileReader();
                     reader.onloadend = () => setNewImage(reader.result);
                     reader.readAsDataURL(file);
@@ -163,6 +169,12 @@ const Community = () => {
               />
               <span className="btn btn-secondary btn-sm" style={{ padding: '6px 12px' }}>📷 Add Photo</span>
             </label>
+            {newImage && (
+              <div style={{ position: 'relative', display: 'inline-block', marginLeft: '10px' }}>
+                <img src={newImage} alt="preview" style={{ height: '40px', width: '40px', objectFit: 'cover', borderRadius: '8px' }} />
+                <button type="button" onClick={() => { setNewImage(null); setNewImageFile(null); }} style={{ position: 'absolute', top: '-5px', right: '-5px', background: 'red', color: 'white', border: 'none', borderRadius: '50%', width: '16px', height: '16px', fontSize: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+              </div>
+            )}
           </div>
           <button type="submit" className="btn btn-primary btn-sm" disabled={!newPost.trim() && !newImage}>
             <Send size={16} /> Post
@@ -182,7 +194,7 @@ const Community = () => {
                     <p className="post-time">{formatTime(post.createdAt)}</p>
                   </div>
                 </div>
-                {(['SUPER_ADMIN', 'GYM_OWNER'].includes(user?.role) || String(post.user_id) === String(user?.id)) && (
+                {(['SUPER_ADMIN', 'GYM_OWNER'].includes(user?.role) || String(post.userId) === String(user?.id)) && (
                   <button onClick={() => handleDeletePost(post._id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
                     <Trash2 size={16} color="#ff4d4f" />
                   </button>

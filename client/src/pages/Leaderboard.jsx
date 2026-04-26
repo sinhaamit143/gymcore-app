@@ -37,7 +37,7 @@ const Leaderboard = () => {
          {leaders[1] && (
            <div className="podium-item podium-silver">
              <div className="rank-badge silver">2</div>
-             <img src={leaders[1].avatar} alt={leaders[1].name} />
+             <img src={leaders[1].id === user?.id ? user?.avatar : leaders[1].avatar} alt={leaders[1].name} />
              <div className="podium-name">{leaders[1].name.split(' ')[0]}</div>
              <div className="podium-points">{leaders[1].points} pts</div>
            </div>
@@ -47,7 +47,7 @@ const Leaderboard = () => {
          {leaders[0] && (
            <div className="podium-item podium-gold">
              <div className="rank-badge gold"><Medal size={16} /></div>
-             <img src={leaders[0].avatar} alt={leaders[0].name} className="gold-avatar" />
+             <img src={leaders[0].id === user?.id ? user?.avatar : leaders[0].avatar} alt={leaders[0].name} className="gold-avatar" />
              <div className="podium-name">{leaders[0].name.split(' ')[0]}</div>
              <div className="podium-points text-accent">{leaders[0].points} pts</div>
            </div>
@@ -57,7 +57,7 @@ const Leaderboard = () => {
          {leaders[2] && (
            <div className="podium-item podium-bronze">
              <div className="rank-badge bronze">3</div>
-             <img src={leaders[2].avatar} alt={leaders[2].name} />
+             <img src={leaders[2].id === user?.id ? user?.avatar : leaders[2].avatar} alt={leaders[2].name} />
              <div className="podium-name">{leaders[2].name.split(' ')[0]}</div>
              <div className="podium-points">{leaders[2].points} pts</div>
            </div>
@@ -68,7 +68,7 @@ const Leaderboard = () => {
         {leaders.slice(3).map((item, index) => (
           <div key={item.id} className={`glass-card run-card ${item.id === user?.id ? 'is-me' : ''}`}>
             <div className="run-rank text-secondary">#{index + 4}</div>
-            <img src={item.avatar} alt={item.name} className="run-avatar" />
+            <img src={item.id === user?.id ? user?.avatar : item.avatar} alt={item.name} className="run-avatar" />
             <div className="run-details">
                <h4 className="run-name">{item.name} {item.id === user?.id && '(You)'}</h4>
             </div>
