@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { Sun, Moon } from 'lucide-react';
+import { Sun, Moon, QrCode, X } from 'lucide-react';
+import QRCode from 'react-qr-code';
 import './index.css';
 
 // Lazy load pages to break circular dependencies and improve performance
@@ -104,13 +105,32 @@ const AppLayout = ({ children }) => {
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
+  const [showGlobalQR, setShowGlobalQR] = useState(false);
   const hideNav = location.pathname === '/login' || user?.role === 'SUPER_ADMIN' || user?.role === 'GYM_OWNER';
 
   return (
     <div className="app-container">
       {user && !hideNav && (
         <>
-          <div style={{ position: 'fixed', top: '16px', right: '16px', zIndex: 9999 }}>
+          <div style={{ position: 'fixed', top: '16px', right: '16px', zIndex: 9999, display: 'flex', gap: '8px' }}>
+            <button 
+              onClick={() => setShowGlobalQR(true)} 
+              style={{ 
+                background: 'var(--glass-bg)', 
+                backdropFilter: 'blur(10px)',
+                border: '1px solid var(--glass-border)', 
+                color: 'var(--text-primary)', 
+                cursor: 'pointer', 
+                padding: '10px',
+                borderRadius: '50%',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+              }}
+            >
+              <QrCode size={20} />
+            </button>
             <button 
               onClick={toggleTheme} 
               style={{ 
@@ -131,6 +151,21 @@ const AppLayout = ({ children }) => {
             </button>
           </div>
           <Header />
+
+          {showGlobalQR && (
+            <div className="modal-overlay animate-fade-in" onClick={() => setShowGlobalQR(false)}>
+              <div className="modal-content" onClick={e => e.stopPropagation()} style={{ textAlign: 'center', maxWidth: '350px' }}>
+                <button className="modal-close" onClick={() => setShowGlobalQR(false)}><X size={24} /></button>
+                <h2 className="modal-title" style={{ marginBottom: '20px' }}>Gym Identity Pass</h2>
+                <div style={{ background: '#fff', padding: '20px', borderRadius: '16px', display: 'inline-block', marginBottom: '20px' }}>
+                  <QRCode value={user?.id || 'guest'} size={250} level="H" />
+                </div>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>
+                  Present this code at the scanner to gain facility access.
+                </p>
+              </div>
+            </div>
+          )}
         </>
       )}
       <Suspense fallback={<div className="page"><p>Loading...</p></div>}>

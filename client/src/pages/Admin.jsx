@@ -95,7 +95,7 @@ const Admin = () => {
   };
 
   // Calculate Revenue
-  const totalOrderRevenue = orders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+  const totalOrderRevenue = orders.reduce((sum, o) => sum + (o.status !== 'CANCELLED' ? (o.totalPrice || 0) : 0), 0);
   const totalSubRevenue = usersList.reduce((sum, u) => sum + (u.totalPaid || 0), 0);
   const totalRevenue = totalOrderRevenue + totalSubRevenue;
 

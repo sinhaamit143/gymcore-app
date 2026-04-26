@@ -304,7 +304,7 @@ app.post('/api/auth/login', async (req, res) => {
     await writeLog('INFO', 'CLIENT_LOGIN', `User ${user.name} logged in`, user.gymId, user.id, { role: user.role });
     const fullUser = await prisma.user.findUnique({
       where: { id: user.id },
-      select: { id: true, email: true, name: true, role: true, gymId: true, avatar: true, phone: true, points: true, subscriptionPlan: true, subscriptionStatus: true },
+      select: { id: true, email: true, name: true, role: true, gymId: true, avatar: true, phone: true, points: true, subscriptionPlan: true, subscriptionStatus: true, subscriptionDuration: true, subscriptionExpiry: true, totalPaid: true },
     });
     const cleanUser = { ...fullUser, password: undefined };
     res.json({ token, user: cleanUser });
@@ -316,7 +316,7 @@ app.get('/api/user', authenticateToken, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({ 
       where: { id: req.user.id },
-      select: { id: true, email: true, name: true, role: true, gymId: true, avatar: true, phone: true, points: true, subscriptionPlan: true, subscriptionStatus: true },
+      select: { id: true, email: true, name: true, role: true, gymId: true, avatar: true, phone: true, points: true, subscriptionPlan: true, subscriptionStatus: true, subscriptionDuration: true, subscriptionExpiry: true, totalPaid: true },
     });
     if (!user) return res.status(404).json({ error: 'User not found' });
     
@@ -1454,6 +1454,19 @@ app.get('/api/user/orders', authenticateToken, async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
     res.json(orders);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/orders/:id', authenticateToken, async (req, res) => {
+  try {
+    const order = await prisma.order.findUnique({ where: { id: req.params.id } });
+    if (!order || order.userId !== req.user.id) return res.status(403).json({ error: 'Unauthorized' });
+    
+    const updated = await prisma.order.update({
+      where: { id: req.params.id },
+      data: { status: 'CANCELLED' }
+    });
+    res.json(updated);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

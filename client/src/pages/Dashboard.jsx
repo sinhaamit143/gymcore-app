@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../App';
 import { Flame, Dumbbell, Apple, Plus, Calendar, X, Target, Edit2, Search, Bell } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import QRCode from 'react-qr-code';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import './Dashboard.css';
 
 const Dashboard = () => {
@@ -149,10 +148,6 @@ const Dashboard = () => {
 
   // Calculate Goal Progress
   const startWeight = user?.currentWeight > user?.targetWeight ? user.currentWeight + 20 : user?.currentWeight - 20; // Mock start
-  const totalToLose = Math.abs(startWeight - user?.targetWeight);
-  const currentLost = Math.abs(startWeight - user?.currentWeight);
-  const progressPercent = Math.min(100, Math.max(0, (currentLost / totalToLose) * 100));
-
   return (
     <div className="page dashboard-page">
       <div className="mb-4" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -160,26 +155,6 @@ const Dashboard = () => {
         <div>
           <h1 className="page-title" style={{ margin: 0, marginBottom: '4px' }}>Hello, {user?.name.split(' ')[0]} 👋</h1>
           <p className="text-secondary" style={{ margin: 0 }}>Ready to crush your goals today?</p>
-        </div>
-      </div>
-
-      <div className="glass-card mb-4" style={{ display: 'flex', alignItems: 'center', gap: '24px', padding: '24px', background: 'linear-gradient(145deg, rgba(59,130,246,0.1), rgba(0,0,0,0.3))', border: '1px solid rgba(59,130,246,0.2)' }}>
-        <div style={{ background: '#fff', padding: '10px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <QRCode value={user?.id || 'guest'} size={80} level="M" />
-        </div>
-        <div style={{ flex: 1 }}>
-          <h3 style={{ margin: '0 0 6px 0', fontSize: '20px', color: '#fff' }}>Digital Pass</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: '0 0 12px 0' }}>Scan at the front desk for instant check-in.</p>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <span style={{ background: 'rgba(59,130,246,0.2)', color: '#3b82f6', padding: '4px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: '800', textTransform: 'uppercase' }}>
-              {user?.subscriptionPlan ? `${user.subscriptionPlan} Tier` : 'Free Tier'}
-            </span>
-            {user?.subscriptionDuration && (
-              <span style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', padding: '4px 12px', borderRadius: '12px', fontSize: '11px', fontWeight: '800' }}>
-                {user.subscriptionDuration}
-              </span>
-            )}
-          </div>
         </div>
       </div>
 
@@ -257,19 +232,55 @@ const Dashboard = () => {
         </div>
       )}
 
-      <div className="glass-card mb-4" style={{ height: '250px', padding: '16px 16px 0 0' }}>
-        <h3 className="mb-4" style={{ paddingLeft: '20px' }}>Activity Overview</h3>
-        <ResponsiveContainer width="100%" height="80%">
-          <BarChart data={last7Days}>
-            <XAxis dataKey="name" stroke="#8b949e" fontSize={12} tickLine={false} axisLine={false} />
-            <Tooltip 
-              cursor={{fill: 'rgba(255,255,255,0.05)'}}
-              contentStyle={{ background: '#161b22', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff' }} 
-            />
-            <Bar dataKey="Burned" fill="#ff4d4f" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="Eaten" fill="#00ffaa" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
+      <div className="glass-card mb-4" style={{ padding: '0' }}>
+        <h3 className="mb-2" style={{ padding: '20px 20px 0 20px' }}>Personal Progress Analytics</h3>
+        <p className="text-secondary" style={{ padding: '0 20px 10px 20px', fontSize: '13px', margin: 0 }}>Track your consistency and progression towards your goals.</p>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', padding: '0 20px 20px 20px' }}>
+          
+          <div style={{ background: 'rgba(0,0,0,0.2)', padding: '15px', borderRadius: '12px' }}>
+            <div className="flex-between mb-3">
+               <h4 style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>Activity & Nutrition (7 Days)</h4>
+               <div style={{ display: 'flex', gap: '8px', fontSize: '10px' }}>
+                  <span style={{ color: '#ff4d4f' }}>● Burned</span>
+                  <span style={{ color: '#00ffaa' }}>● Eaten</span>
+               </div>
+            </div>
+            <div style={{ height: '200px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={last7Days}>
+                  <XAxis dataKey="name" stroke="#8b949e" fontSize={10} tickLine={false} axisLine={false} />
+                  <Tooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{ background: '#161b22', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '12px' }} />
+                  <Bar dataKey="Burned" fill="#ff4d4f" radius={[4, 4, 0, 0]} barSize={12} />
+                  <Bar dataKey="Eaten" fill="#00ffaa" radius={[4, 4, 0, 0]} barSize={12} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div style={{ background: 'rgba(0,0,0,0.2)', padding: '15px', borderRadius: '12px' }}>
+            <div className="flex-between mb-3">
+               <h4 style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>Weight Progression Trend</h4>
+               <span style={{ fontSize: '10px', background: 'rgba(59,130,246,0.2)', color: '#3b82f6', padding: '2px 8px', borderRadius: '10px' }}>Target: {user?.targetWeight || 'N/A'}</span>
+            </div>
+            <div style={{ height: '200px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={[
+                  { name: 'Start', weight: startWeight },
+                  { name: 'Wk 2', weight: startWeight - ((startWeight - (user?.currentWeight || startWeight)) * 0.3) },
+                  { name: 'Wk 4', weight: startWeight - ((startWeight - (user?.currentWeight || startWeight)) * 0.7) },
+                  { name: 'Now', weight: user?.currentWeight || startWeight }
+                ]}>
+                  <XAxis dataKey="name" stroke="#8b949e" fontSize={10} tickLine={false} axisLine={false} />
+                  <YAxis domain={['dataMin - 5', 'dataMax + 5']} hide />
+                  <Tooltip contentStyle={{ background: '#161b22', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '12px' }} />
+                  <Line type="monotone" dataKey="weight" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+        </div>
       </div>
 
       <div className="section mb-4">

@@ -29,16 +29,6 @@ const Header = () => {
         )}
       </Link>
 
-      <div className="header-actions">
-        {user?.subscriptionPlan === 'elite' && (
-          <div className="status-indicator">
-            <Shield size={12} fill="var(--accent-color)" color="#000" /> Elite Access
-          </div>
-        )}
-        <div className="status-indicator" style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', borderColor: 'rgba(255,255,255,0.1)' }}>
-          <div className="pulse"></div> System Live
-        </div>
-      </div>
     </header>
   );
 };

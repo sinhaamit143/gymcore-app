@@ -52,12 +52,24 @@ const Community = () => {
   };
 
   const handleLike = async (postId) => {
+    // Optimistic UI Update
+    setPosts(posts.map(p => {
+      if (p._id === postId) {
+        const isLiked = p.likedBy?.map(String).includes(String(user?.id));
+        return {
+          ...p,
+          likes: isLiked ? Math.max(0, p.likes - 1) : p.likes + 1,
+          likedBy: isLiked ? (p.likedBy || []).filter(id => String(id) !== String(user?.id)) : [...(p.likedBy || []), String(user?.id)]
+        };
+      }
+      return p;
+    }));
+
     try {
       await fetch(`/api/community/posts/${postId}/like`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      fetchPosts();
     } catch (err) { console.error(err); }
   };
 
@@ -75,6 +87,22 @@ const Community = () => {
   const handleCommentSubmit = async (e, postId) => {
     e.preventDefault();
     if (!commentText.trim()) return;
+
+    // Optimistic UI Update for comments
+    setPosts(posts.map(p => {
+      if (p._id === postId) {
+        return {
+          ...p,
+          comments: [...(p.comments || []), { _id: Date.now().toString(), user_name: user?.name || 'You', user_avatar: user?.avatar, content: commentText }]
+        };
+      }
+      return p;
+    }));
+
+    const textToSend = commentText;
+    setCommentText('');
+    setActiveCommentPost(null);
+
     try {
       await fetch(`/api/community/posts/${postId}/comment`, {
         method: 'POST',
@@ -82,11 +110,8 @@ const Community = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}` 
         },
-        body: JSON.stringify({ content: commentText })
+        body: JSON.stringify({ content: textToSend })
       });
-      setCommentText('');
-      setActiveCommentPost(null);
-      fetchPosts();
     } catch (err) { console.error(err); }
   };
 
@@ -157,7 +182,7 @@ const Community = () => {
                     <p className="post-time">{formatTime(post.createdAt)}</p>
                   </div>
                 </div>
-                {(['SUPER_ADMIN', 'GYM_OWNER'].includes(user?.role) || post.user_id === user?.id) && (
+                {(['SUPER_ADMIN', 'GYM_OWNER'].includes(user?.role) || String(post.user_id) === String(user?.id)) && (
                   <button onClick={() => handleDeletePost(post._id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
                     <Trash2 size={16} color="#ff4d4f" />
                   </button>
@@ -171,17 +196,17 @@ const Community = () => {
               </div>
               <div className="post-footer" style={{ display: 'flex', gap: '16px' }}>
                 <button 
-                  className={`action-btn ${post.likedBy?.includes(user?.id) ? 'liked' : ''}`} 
+                  className={`action-btn ${post.likedBy?.map(String).includes(String(user?.id)) ? 'liked' : ''}`} 
                   onClick={() => handleLike(post._id)}
-                  style={{ color: post.likedBy?.includes(user?.id) ? '#ff4d4f' : 'inherit' }}
+                  style={{ color: post.likedBy?.map(String).includes(String(user?.id)) ? '#ff4d4f' : 'inherit' }}
                 >
-                  <Heart size={18} fill={post.likedBy?.includes(user?.id) ? '#ff4d4f' : 'none'} /> {post.likes} Likes
+                  <Heart size={18} fill={post.likedBy?.map(String).includes(String(user?.id)) ? '#ff4d4f' : 'none'} /> {post.likes} Likes
                 </button>
                 <button 
                   className="action-btn" 
                   onClick={() => {
                     setActiveCommentPost(activeCommentPost === post._id ? null : post._id);
-                    setCommentText('');
+                    if (activeCommentPost !== post._id) setCommentText('');
                   }}
                 >
                   <MessageCircle size={18} /> {post.comments?.length || 0} Comments
@@ -193,9 +218,18 @@ const Community = () => {
                   {post.comments.map(c => (
                     <div key={c._id} className="comment-item" style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                       <img src={c.user_avatar} alt={c.user_name} style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />
-                      <div className="comment-content" style={{ background: 'rgba(0,0,0,0.2)', padding: '8px 12px', borderRadius: '12px', flex: 1 }}>
+                      <div className="comment-content" style={{ background: 'rgba(0,0,0,0.2)', padding: '8px 12px', borderRadius: '12px', flex: 1, position: 'relative' }}>
                         <h5 style={{ fontSize: '13px', marginBottom: '4px', color: '#fff' }}>{c.user_name}</h5>
                         <p style={{ fontSize: '14px', color: '#ccc' }}>{c.content}</p>
+                        <button 
+                          onClick={() => {
+                            setActiveCommentPost(post._id);
+                            setCommentText(`@${c.user_name.split(' ')[0]} `);
+                          }}
+                          style={{ position: 'absolute', top: '8px', right: '12px', background: 'none', border: 'none', color: 'var(--accent-color)', fontSize: '11px', cursor: 'pointer' }}
+                        >
+                          Reply
+                        </button>
                       </div>
                     </div>
                   ))}
